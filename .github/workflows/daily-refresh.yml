@@ -1,0 +1,22 @@
+name: Daily Data Refresh
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # 6am UTC daily
+  workflow_dispatch: # allow manual runs
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call refresh endpoint
+        run: |
+          response=$(curl -s -o /tmp/response.json -w "%{http_code}" \
+            -X POST "${{ secrets.VERCEL_URL }}/api/refresh" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json")
+          cat /tmp/response.json
+          if [ "$response" -ne 200 ]; then
+            echo "Refresh failed with status $response"
+            exit 1
+          fi
