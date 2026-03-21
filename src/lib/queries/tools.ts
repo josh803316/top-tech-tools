@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { tools, categories, toolCategories } from "@/lib/db/schema";
-import { eq, desc, asc, ilike, or, inArray, sql } from "drizzle-orm";
-import type { SortOption, Tool, Category } from "@/lib/types";
+import { eq, desc, asc, ilike, or, inArray, sql, gte, lt, and } from "drizzle-orm";
+import type { SortOption, QualityLevel, ActivityLevel, Tool, Category } from "@/lib/types";
 
 type RawTool = typeof tools.$inferSelect;
 type RawCategory = typeof categories.$inferSelect;
@@ -35,12 +35,18 @@ export async function getTools({
   sort = "stars",
   category,
   q,
+  quality,
+  activity,
+  letter,
   cursor,
-  limit = 24,
+  limit = 48,
 }: {
   sort?: SortOption;
   category?: string;
   q?: string;
+  quality?: QualityLevel;
+  activity?: ActivityLevel;
+  letter?: string;
   cursor?: string;
   limit?: number;
 }): Promise<{ items: Tool[]; nextCursor: string | null }> {
@@ -73,6 +79,24 @@ export async function getTools({
   if (filteredIds !== null) {
     if (filteredIds.length === 0) return { items: [], nextCursor: null };
     conditions.push(inArray(tools.id, filteredIds));
+  }
+
+  if (quality === "elite") conditions.push(gte(tools.stars, 10000));
+  else if (quality === "high") conditions.push(and(gte(tools.stars, 1000), lt(tools.stars, 10000))!);
+  else if (quality === "mid") conditions.push(and(gte(tools.stars, 100), lt(tools.stars, 1000))!);
+  else if (quality === "low") conditions.push(lt(tools.stars, 100));
+
+  if (activity) {
+    const now = new Date();
+    const cutoff = (days: number) => new Date(now.getTime() - days * 86400000);
+    if (activity === "hot") conditions.push(gte(tools.lastPushedAt, cutoff(7)));
+    else if (activity === "active") conditions.push(and(gte(tools.lastPushedAt, cutoff(30)), lt(tools.lastPushedAt, cutoff(7)))!);
+    else if (activity === "recent") conditions.push(and(gte(tools.lastPushedAt, cutoff(90)), lt(tools.lastPushedAt, cutoff(30)))!);
+    else if (activity === "stale") conditions.push(lt(tools.lastPushedAt, cutoff(90)));
+  }
+
+  if (letter) {
+    conditions.push(ilike(tools.name, `${letter}%`));
   }
 
   if (cursor) {

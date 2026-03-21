@@ -1,174 +1,126 @@
 "use client";
 
-import { Star, GitFork, ExternalLink, Package } from "lucide-react";
-import { Badge } from "@/components/ui/Badge";
-import type { Tool } from "@/lib/types";
+import { Star, Package, GitFork, ExternalLink } from "lucide-react";
 import Link from "next/link";
+import type { Tool } from "@/lib/types";
 
-function formatNumber(n: number): string {
+function fmt(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}m`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
   return n.toString();
 }
 
-type ToolCardProps = {
-  tool: Tool;
-};
+function activityInfo(lastPushedAt: string | null): { label: string; color: string } {
+  if (!lastPushedAt) return { label: "unknown", color: "var(--text-muted)" };
+  const days = (Date.now() - new Date(lastPushedAt).getTime()) / 86400000;
+  if (days < 7) return { label: "hot", color: "#22c55e" };
+  if (days < 30) return { label: "active", color: "#4f83ff" };
+  if (days < 90) return { label: "recent", color: "#f59e0b" };
+  return { label: "stale", color: "var(--text-muted)" };
+}
 
-export function ToolCard({ tool }: ToolCardProps) {
+export function ToolRow({ tool }: { tool: Tool }) {
+  const activity = activityInfo(tool.lastPushedAt);
+
   return (
-    <Link
-      href={`/tool/${tool.slug}`}
-      style={{ textDecoration: "none" }}
-    >
-      <div
-        style={{
-          background: "var(--surface)",
-          border: "1px solid var(--border)",
-          borderRadius: "12px",
-          padding: "20px",
-          cursor: "pointer",
-          transition: "background 0.15s, border-color 0.15s, transform 0.1s",
-          height: "100%",
-          display: "flex",
-          flexDirection: "column",
-          gap: "12px",
-        }}
-        onMouseEnter={(e) => {
-          (e.currentTarget as HTMLElement).style.background = "var(--surface-hover)";
-          (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.15)";
-        }}
-        onMouseLeave={(e) => {
-          (e.currentTarget as HTMLElement).style.background = "var(--surface)";
-          (e.currentTarget as HTMLElement).style.borderColor = "var(--border)";
-        }}
-      >
-        {/* Header row */}
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", minWidth: 0 }}>
-            <span
-              style={{
-                fontSize: "15px",
-                fontWeight: 600,
-                color: "var(--text-primary)",
-                letterSpacing: "-0.01em",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {tool.name}
-            </span>
+    <tr className="row-hover" style={{ borderBottom: "1px solid var(--border)", cursor: "pointer" }}>
+      {/* Name + category */}
+      <td style={{ padding: "10px 12px 10px 16px", verticalAlign: "middle", width: "200px" }}>
+        <Link href={`/tool/${tool.slug}`} style={{ textDecoration: "none" }}>
+          <div style={{ fontWeight: 600, fontSize: "13px", color: "var(--text-primary)", letterSpacing: "-0.01em", marginBottom: "3px" }}>
+            {tool.name}
             {tool.featured && (
-              <Badge variant="featured">featured</Badge>
+              <span style={{ marginLeft: "6px", fontSize: "9px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--accent)", verticalAlign: "middle" }}>
+                featured
+              </span>
             )}
           </div>
-          <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
-            {tool.categories.slice(0, 2).map((cat) => (
-              <Badge key={cat.slug} variant="category">{cat.label}</Badge>
-            ))}
-          </div>
-        </div>
+          {tool.categories[0] && (
+            <div style={{ fontSize: "10px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              {tool.categories[0].label}
+            </div>
+          )}
+        </Link>
+      </td>
 
-        {/* Description */}
-        <p
-          style={{
+      {/* Description */}
+      <td style={{ padding: "10px 16px 10px 0", verticalAlign: "middle" }}>
+        <Link href={`/tool/${tool.slug}`} style={{ textDecoration: "none" }}>
+          <p style={{
+            fontSize: "12px",
             color: "var(--text-secondary)",
-            fontSize: "13px",
-            lineHeight: "1.5",
+            lineHeight: 1.5,
             margin: 0,
-            flex: 1,
             display: "-webkit-box",
             WebkitLineClamp: 2,
             WebkitBoxOrient: "vertical",
             overflow: "hidden",
-          }}
-        >
-          {tool.description}
-        </p>
+          }}>
+            {tool.description}
+          </p>
+        </Link>
+      </td>
 
-        {/* Stats row */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "16px",
-            marginTop: "auto",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "4px",
-              color: "var(--text-secondary)",
-              fontSize: "12px",
-            }}
-          >
-            <Star size={12} fill="currentColor" />
-            <span>{formatNumber(tool.stars)}</span>
-          </div>
-          {tool.installsLast30d > 0 && (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "4px",
-                color: "var(--text-secondary)",
-                fontSize: "12px",
-              }}
-            >
-              <Package size={12} />
-              <span>{formatNumber(tool.installsLast30d)}/mo</span>
-            </div>
-          )}
-          {tool.currentVersion && (
-            <span style={{ color: "var(--text-secondary)", fontSize: "12px" }}>
-              v{tool.currentVersion}
-            </span>
-          )}
-
-          {/* Links */}
-          <div style={{ marginLeft: "auto", display: "flex", gap: "8px" }}>
-            {tool.githubUrl && (
-              <a
-                href={tool.githubUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                style={{
-                  color: "var(--text-secondary)",
-                  transition: "color 0.15s",
-                  display: "flex",
-                  alignItems: "center",
-                }}
-                onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--text-primary)")}
-                onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--text-secondary)")}
-                title="GitHub"
-              >
-                <GitFork size={14} />
-              </a>
-            )}
-            {tool.brewUrl && (
-              <a
-                href={tool.brewUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                style={{
-                  color: "var(--text-secondary)",
-                  transition: "color 0.15s",
-                  display: "flex",
-                  alignItems: "center",
-                }}
-                onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--text-primary)")}
-                onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--text-secondary)")}
-                title="Homebrew"
-              >
-                <ExternalLink size={14} />
-              </a>
-            )}
-          </div>
+      {/* Stars */}
+      <td style={{ padding: "10px 16px 10px 0", verticalAlign: "middle", width: "72px", whiteSpace: "nowrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "4px", color: "var(--text-secondary)", fontSize: "12px" }}>
+          <Star size={11} fill="currentColor" />
+          {fmt(tool.stars)}
         </div>
-      </div>
-    </Link>
+      </td>
+
+      {/* Activity */}
+      <td style={{ padding: "10px 16px 10px 0", verticalAlign: "middle", width: "80px", whiteSpace: "nowrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "11px" }}>
+          <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: activity.color, flexShrink: 0 }} />
+          <span style={{ color: activity.color, fontWeight: 500 }}>{activity.label}</span>
+        </div>
+      </td>
+
+      {/* Version */}
+      <td style={{ padding: "10px 16px 10px 0", verticalAlign: "middle", width: "72px", whiteSpace: "nowrap" }}>
+        {tool.currentVersion ? (
+          <span style={{ fontSize: "11px", color: "var(--text-muted)", fontFamily: "monospace" }}>
+            v{tool.currentVersion}
+          </span>
+        ) : null}
+      </td>
+
+      {/* Installs */}
+      <td style={{ padding: "10px 16px 10px 0", verticalAlign: "middle", width: "80px", whiteSpace: "nowrap" }}>
+        {tool.installsLast30d > 0 ? (
+          <div style={{ display: "flex", alignItems: "center", gap: "4px", color: "var(--text-secondary)", fontSize: "11px" }}>
+            <Package size={10} />
+            {fmt(tool.installsLast30d)}/mo
+          </div>
+        ) : null}
+      </td>
+
+      {/* Links */}
+      <td style={{ padding: "10px 16px 10px 0", verticalAlign: "middle", width: "48px" }}>
+        <div style={{ display: "flex", gap: "8px" }}>
+          {tool.githubUrl && (
+            <a href={tool.githubUrl} target="_blank" rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              style={{ color: "var(--text-muted)", display: "flex", alignItems: "center", transition: "color 0.12s" }}
+              onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--text-primary)")}
+              onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--text-muted)")}
+            >
+              <GitFork size={13} />
+            </a>
+          )}
+          {tool.websiteUrl && (
+            <a href={tool.websiteUrl} target="_blank" rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              style={{ color: "var(--text-muted)", display: "flex", alignItems: "center", transition: "color 0.12s" }}
+              onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--text-primary)")}
+              onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--text-muted)")}
+            >
+              <ExternalLink size={13} />
+            </a>
+          )}
+        </div>
+      </td>
+    </tr>
   );
 }
