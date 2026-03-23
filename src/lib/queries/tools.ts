@@ -206,6 +206,50 @@ export async function getAllCategories() {
   });
 }
 
+export async function getFilterCounts(): Promise<{
+  categories: Record<string, number>;
+  quality: Record<string, number>;
+  activity: Record<string, number>;
+}> {
+  const now = new Date();
+  const cutoff = (days: number) => new Date(now.getTime() - days * 86400000);
+
+  const [
+    catRows, eliteRow, highRow, midRow, lowRow,
+    hotRow, activeRow, recentRow, staleRow,
+  ] = await Promise.all([
+    db
+      .select({ slug: categories.slug, count: sql<number>`cast(count(*) as int)` })
+      .from(toolCategories)
+      .innerJoin(categories, eq(toolCategories.categoryId, categories.id))
+      .groupBy(categories.slug),
+    db.select({ count: sql<number>`cast(count(*) as int)` }).from(tools).where(gte(tools.stars, 10000)),
+    db.select({ count: sql<number>`cast(count(*) as int)` }).from(tools).where(and(gte(tools.stars, 1000), lt(tools.stars, 10000))!),
+    db.select({ count: sql<number>`cast(count(*) as int)` }).from(tools).where(and(gte(tools.stars, 100), lt(tools.stars, 1000))!),
+    db.select({ count: sql<number>`cast(count(*) as int)` }).from(tools).where(lt(tools.stars, 100)),
+    db.select({ count: sql<number>`cast(count(*) as int)` }).from(tools).where(gte(tools.lastPushedAt, cutoff(7))),
+    db.select({ count: sql<number>`cast(count(*) as int)` }).from(tools).where(and(gte(tools.lastPushedAt, cutoff(30)), lt(tools.lastPushedAt, cutoff(7)))!),
+    db.select({ count: sql<number>`cast(count(*) as int)` }).from(tools).where(and(gte(tools.lastPushedAt, cutoff(90)), lt(tools.lastPushedAt, cutoff(30)))!),
+    db.select({ count: sql<number>`cast(count(*) as int)` }).from(tools).where(lt(tools.lastPushedAt, cutoff(90))),
+  ]);
+
+  return {
+    categories: Object.fromEntries(catRows.map((r) => [r.slug, r.count])),
+    quality: {
+      elite: eliteRow[0]?.count ?? 0,
+      high: highRow[0]?.count ?? 0,
+      mid: midRow[0]?.count ?? 0,
+      low: lowRow[0]?.count ?? 0,
+    },
+    activity: {
+      hot: hotRow[0]?.count ?? 0,
+      active: activeRow[0]?.count ?? 0,
+      recent: recentRow[0]?.count ?? 0,
+      stale: staleRow[0]?.count ?? 0,
+    },
+  };
+}
+
 export async function getTopToolsByCategory(
   topN = 3
 ): Promise<Array<{ category: Category; tools: Tool[] }>> {

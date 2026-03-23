@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import "./globals.css";
 import { Header } from "@/components/Header";
 import { Sidebar } from "@/components/Sidebar";
-import { getAllCategories } from "@/lib/queries/tools";
+import { getAllCategories, getFilterCounts } from "@/lib/queries/tools";
 
 export const metadata: Metadata = {
   title: "Top Tech Tools — The Complete Developer Ecosystem",
@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const categories = await getAllCategories();
+  const [categories, counts] = await Promise.all([getAllCategories(), getFilterCounts()]);
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -28,7 +28,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <Header />
           <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
             <Suspense fallback={<div style={{ width: "var(--sidebar-width)", flexShrink: 0, background: "var(--surface)", borderRight: "1px solid var(--border)" }} />}>
-              <Sidebar categories={categories} />
+              <Sidebar categories={categories} counts={counts} />
             </Suspense>
             <main
               style={{

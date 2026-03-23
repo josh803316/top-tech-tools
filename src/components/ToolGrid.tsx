@@ -1,7 +1,8 @@
 "use client";
 
-import { ToolRow } from "@/components/ToolCard";
+import { ToolRow, ToolListItem, ToolCard } from "@/components/ToolCard";
 import type { Tool } from "@/lib/types";
+import type { ViewMode } from "@/components/ViewToggle";
 
 const COL_HEADERS = [
   { label: "Tool", width: "200px" },
@@ -13,15 +14,39 @@ const COL_HEADERS = [
   { label: "", width: "48px" },
 ];
 
-export function ToolTable({ tools }: { tools: Tool[] }) {
-  if (tools.length === 0) {
+const EMPTY = (
+  <div style={{ textAlign: "center", padding: "80px 20px", color: "var(--text-secondary)", fontSize: "14px" }}>
+    No tools match these filters.
+  </div>
+);
+
+export function ToolTable({ tools, view = "table" }: { tools: Tool[]; view?: ViewMode }) {
+  if (tools.length === 0) return EMPTY;
+
+  if (view === "cards") {
     return (
-      <div style={{ textAlign: "center", padding: "80px 20px", color: "var(--text-secondary)", fontSize: "14px" }}>
-        No tools match these filters.
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+          gap: "12px",
+          padding: "16px",
+        }}
+      >
+        {tools.map((tool) => <ToolCard key={tool.id} tool={tool} />)}
       </div>
     );
   }
 
+  if (view === "list") {
+    return (
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        {tools.map((tool) => <ToolListItem key={tool.id} tool={tool} />)}
+      </div>
+    );
+  }
+
+  // table (default)
   return (
     <table style={{ width: "100%", borderCollapse: "collapse" }}>
       <thead>
@@ -47,9 +72,7 @@ export function ToolTable({ tools }: { tools: Tool[] }) {
         </tr>
       </thead>
       <tbody>
-        {tools.map((tool) => (
-          <ToolRow key={tool.id} tool={tool} />
-        ))}
+        {tools.map((tool) => <ToolRow key={tool.id} tool={tool} />)}
       </tbody>
     </table>
   );

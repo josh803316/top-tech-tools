@@ -19,19 +19,17 @@ const ICONS: Record<string, React.ElementType> = {
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
 const QUALITY_OPTIONS = [
-  { value: "", label: "Any" },
-  { value: "elite", label: "Elite 10k+" },
-  { value: "high", label: "High 1k+" },
-  { value: "mid", label: "Mid 100+" },
-  { value: "low", label: "Low" },
+  { value: "elite", label: "Elite", sublabel: "10k+" },
+  { value: "high", label: "High", sublabel: "1k+" },
+  { value: "mid", label: "Mid", sublabel: "100+" },
+  { value: "low", label: "Low", sublabel: "<100" },
 ];
 
 const ACTIVITY_OPTIONS = [
-  { value: "", label: "Any" },
-  { value: "hot", label: "Hot <7d" },
-  { value: "active", label: "Active <30d" },
-  { value: "recent", label: "Recent <90d" },
-  { value: "stale", label: "Stale" },
+  { value: "hot", label: "Hot", sublabel: "<7d" },
+  { value: "active", label: "Active", sublabel: "<30d" },
+  { value: "recent", label: "Recent", sublabel: "<90d" },
+  { value: "stale", label: "Stale", sublabel: "90d+" },
 ];
 
 const SORT_OPTIONS = [
@@ -41,9 +39,18 @@ const SORT_OPTIONS = [
   { value: "installs", label: "Installs" },
 ];
 
-type SidebarProps = { categories: Category[] };
+type FilterCounts = {
+  categories: Record<string, number>;
+  quality: Record<string, number>;
+  activity: Record<string, number>;
+};
 
-export function Sidebar({ categories }: SidebarProps) {
+type SidebarProps = {
+  categories: Category[];
+  counts: FilterCounts;
+};
+
+export function Sidebar({ categories, counts }: SidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -172,11 +179,12 @@ export function Sidebar({ categories }: SidebarProps) {
             style={catRowStyle(!activeCategory)}
           >
             <FolderOpen size={13} />
-            All categories
+            <span style={{ flex: 1 }}>All categories</span>
           </Link>
           {categories.map((cat) => {
             const Icon = ICONS[cat.iconName] ?? Terminal;
             const active = activeCategory === cat.slug;
+            const count = counts.categories[cat.slug];
             return (
               <a
                 key={cat.slug}
@@ -185,7 +193,10 @@ export function Sidebar({ categories }: SidebarProps) {
                 style={catRowStyle(active)}
               >
                 <Icon size={13} />
-                {cat.label}
+                <span style={{ flex: 1 }}>{cat.label}</span>
+                {count !== undefined && (
+                  <CountBadge value={count} active={active} />
+                )}
               </a>
             );
           })}
@@ -196,16 +207,26 @@ export function Sidebar({ categories }: SidebarProps) {
 
       {/* Quality */}
       <Section label="Quality">
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
-          {QUALITY_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => update({ quality: opt.value })}
-              style={chipStyle(activeQuality === opt.value)}
-            >
-              {opt.label}
-            </button>
-          ))}
+        <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+          {QUALITY_OPTIONS.map((opt) => {
+            const active = activeQuality === opt.value;
+            const count = counts.quality[opt.value];
+            return (
+              <button
+                key={opt.value}
+                onClick={() => update({ quality: active ? "" : opt.value })}
+                style={facetRowStyle(active)}
+              >
+                <span style={{ flex: 1, textAlign: "left" }}>
+                  {opt.label}
+                  <span style={{ marginLeft: "5px", fontSize: "10px", color: active ? "rgba(79,131,255,0.7)" : "var(--text-muted)" }}>
+                    {opt.sublabel}
+                  </span>
+                </span>
+                {count !== undefined && <CountBadge value={count} active={active} />}
+              </button>
+            );
+          })}
         </div>
       </Section>
 
@@ -213,21 +234,51 @@ export function Sidebar({ categories }: SidebarProps) {
 
       {/* Activity */}
       <Section label="Activity">
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
-          {ACTIVITY_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => update({ activity: opt.value })}
-              style={chipStyle(activeActivity === opt.value)}
-            >
-              {opt.label}
-            </button>
-          ))}
+        <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+          {ACTIVITY_OPTIONS.map((opt) => {
+            const active = activeActivity === opt.value;
+            const count = counts.activity[opt.value];
+            return (
+              <button
+                key={opt.value}
+                onClick={() => update({ activity: active ? "" : opt.value })}
+                style={facetRowStyle(active)}
+              >
+                <span style={{ flex: 1, textAlign: "left" }}>
+                  {opt.label}
+                  <span style={{ marginLeft: "5px", fontSize: "10px", color: active ? "rgba(79,131,255,0.7)" : "var(--text-muted)" }}>
+                    {opt.sublabel}
+                  </span>
+                </span>
+                {count !== undefined && <CountBadge value={count} active={active} />}
+              </button>
+            );
+          })}
         </div>
       </Section>
 
       <div style={{ flex: 1 }} />
     </aside>
+  );
+}
+
+function CountBadge({ value, active }: { value: number; active: boolean }) {
+  return (
+    <span
+      style={{
+        fontSize: "10px",
+        fontWeight: 500,
+        color: active ? "var(--accent)" : "var(--text-muted)",
+        background: active ? "rgba(79,131,255,0.12)" : "rgba(255,255,255,0.04)",
+        borderRadius: "4px",
+        padding: "1px 5px",
+        minWidth: "24px",
+        textAlign: "center",
+        fontVariantNumeric: "tabular-nums",
+      }}
+    >
+      {value >= 1000 ? `${(value / 1000).toFixed(1)}k` : value}
+    </span>
   );
 }
 
@@ -302,5 +353,23 @@ function catRowStyle(active: boolean): React.CSSProperties {
     cursor: "pointer",
     transition: "all 0.12s",
     textDecoration: "none",
+  };
+}
+
+function facetRowStyle(active: boolean): React.CSSProperties {
+  return {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    padding: "5px 7px",
+    borderRadius: "5px",
+    fontSize: "12px",
+    fontWeight: active ? 500 : 400,
+    color: active ? "var(--text-primary)" : "var(--text-secondary)",
+    background: active ? "var(--accent-dim)" : "transparent",
+    border: "none",
+    cursor: "pointer",
+    transition: "all 0.12s",
+    width: "100%",
   };
 }

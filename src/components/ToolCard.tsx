@@ -1,6 +1,6 @@
 "use client";
 
-import { Star, Package, GitFork, ExternalLink } from "lucide-react";
+import { Star, Package, GitFork, ExternalLink, ArrowUpRight } from "lucide-react";
 import Link from "next/link";
 import type { Tool } from "@/lib/types";
 
@@ -18,6 +18,140 @@ function activityInfo(lastPushedAt: string | null): { label: string; color: stri
   if (days < 90) return { label: "recent", color: "#f59e0b" };
   return { label: "stale", color: "var(--text-muted)" };
 }
+
+// ─── List item (compact single-row) ─────────────────────────────────────────
+
+export function ToolListItem({ tool }: { tool: Tool }) {
+  const activity = activityInfo(tool.lastPushedAt);
+  return (
+    <Link
+      href={`/tool/${tool.slug}`}
+      className="row-hover"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "12px",
+        padding: "9px 16px",
+        borderBottom: "1px solid var(--border)",
+        textDecoration: "none",
+      }}
+    >
+      {/* Name */}
+      <div style={{ width: "180px", flexShrink: 0 }}>
+        <span style={{ fontWeight: 600, fontSize: "13px", color: "var(--text-primary)", letterSpacing: "-0.01em" }}>
+          {tool.name}
+        </span>
+        {tool.featured && (
+          <span style={{ marginLeft: "6px", fontSize: "9px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--accent)", verticalAlign: "middle" }}>
+            featured
+          </span>
+        )}
+      </div>
+
+      {/* Description */}
+      <p style={{ flex: 1, fontSize: "12px", color: "var(--text-secondary)", margin: 0, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
+        {tool.description}
+      </p>
+
+      {/* Meta */}
+      <div style={{ display: "flex", alignItems: "center", gap: "14px", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "4px", color: "var(--text-secondary)", fontSize: "11px", width: "52px", justifyContent: "flex-end" }}>
+          <Star size={10} fill="currentColor" />
+          {fmt(tool.stars)}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "11px", width: "52px" }}>
+          <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: activity.color, flexShrink: 0 }} />
+          <span style={{ color: activity.color, fontWeight: 500 }}>{activity.label}</span>
+        </div>
+        {tool.categories[0] && (
+          <span style={{ fontSize: "10px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", width: "90px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {tool.categories[0].label}
+          </span>
+        )}
+      </div>
+    </Link>
+  );
+}
+
+// ─── Card ────────────────────────────────────────────────────────────────────
+
+export function ToolCard({ tool }: { tool: Tool }) {
+  const activity = activityInfo(tool.lastPushedAt);
+  return (
+    <Link
+      href={`/tool/${tool.slug}`}
+      className="card-hover"
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: "10px",
+        padding: "14px",
+        background: "var(--surface)",
+        border: "1px solid var(--border)",
+        borderRadius: "10px",
+        textDecoration: "none",
+        transition: "border-color 0.15s",
+      }}
+    >
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>
+        <div>
+          <div style={{ fontWeight: 600, fontSize: "13px", color: "var(--text-primary)", letterSpacing: "-0.01em" }}>
+            {tool.name}
+            {tool.featured && (
+              <span style={{ marginLeft: "6px", fontSize: "9px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--accent)", verticalAlign: "middle" }}>
+                featured
+              </span>
+            )}
+          </div>
+          {tool.categories[0] && (
+            <div style={{ fontSize: "10px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginTop: "2px" }}>
+              {tool.categories[0].label}
+            </div>
+          )}
+        </div>
+        <ArrowUpRight size={13} style={{ color: "var(--text-muted)", flexShrink: 0, marginTop: "1px" }} />
+      </div>
+
+      {/* Description */}
+      <p style={{
+        fontSize: "12px",
+        color: "var(--text-secondary)",
+        lineHeight: 1.55,
+        margin: 0,
+        flex: 1,
+        display: "-webkit-box",
+        WebkitLineClamp: 3,
+        WebkitBoxOrient: "vertical",
+        overflow: "hidden",
+      }}>
+        {tool.description}
+      </p>
+
+      {/* Footer */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: "8px", borderTop: "1px solid var(--border)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "4px", color: "var(--text-secondary)", fontSize: "11px" }}>
+            <Star size={10} fill="currentColor" />
+            {fmt(tool.stars)}
+          </div>
+          {tool.installsLast30d > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: "4px", color: "var(--text-secondary)", fontSize: "11px" }}>
+              <Package size={10} />
+              {fmt(tool.installsLast30d)}/mo
+            </div>
+          )}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "11px" }}>
+          <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: activity.color }} />
+          <span style={{ color: activity.color, fontWeight: 500 }}>{activity.label}</span>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+// ─── Table row ───────────────────────────────────────────────────────────────
 
 export function ToolRow({ tool }: { tool: Tool }) {
   const activity = activityInfo(tool.lastPushedAt);
