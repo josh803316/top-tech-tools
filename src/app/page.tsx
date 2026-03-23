@@ -1,9 +1,8 @@
 import { getTools } from "@/lib/queries/tools";
 import { ToolTable } from "@/components/ToolGrid";
-import { ViewToggle } from "@/components/ViewToggle";
+import { Toolbar } from "@/components/Toolbar";
 import { Suspense } from "react";
-import type { SortOption, QualityLevel, ActivityLevel } from "@/lib/types";
-import type { ViewMode } from "@/components/ViewToggle";
+import type { SortOption, QualityLevel, ActivityLevel, ViewMode } from "@/lib/types";
 
 export const revalidate = 3600;
 
@@ -20,7 +19,7 @@ type SearchParams = {
 export default async function HomePage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams;
   const sort = (params.sort ?? "stars") as SortOption;
-  const view = (params.view ?? "table") as ViewMode;
+  const view = (params.view ?? "cards") as ViewMode;
 
   const { items: tools } = await getTools({
     sort,
@@ -31,35 +30,14 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     letter: params.letter,
   });
 
-  const hasFilters = params.category || params.q || params.quality || params.activity || params.letter;
-
   return (
-    <div style={{ padding: "0 0 64px", display: "flex", flexDirection: "column", height: "100%" }}>
-      {/* Toolbar */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "12px 16px",
-          borderBottom: "1px solid var(--border)",
-          flexShrink: 0,
-        }}
-      >
-        <div>
-          <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)" }}>
-            {hasFilters ? "Filtered results" : "All tools"}
-          </span>
-          <span style={{ marginLeft: "8px", fontSize: "12px", color: "var(--text-muted)" }}>
-            {tools.length} tools
-          </span>
-        </div>
-        <Suspense fallback={null}>
-          <ViewToggle active={view} />
-        </Suspense>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <Suspense fallback={<div style={{ height: "54px", borderBottom: "1px solid var(--border)" }} />}>
+        <Toolbar active={view} total={tools.length} />
+      </Suspense>
+      <div style={{ flex: 1, overflowY: "auto" }}>
+        <ToolTable tools={tools} view={view} />
       </div>
-
-      <ToolTable tools={tools} view={view} />
     </div>
   );
 }

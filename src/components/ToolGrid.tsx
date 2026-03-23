@@ -2,7 +2,7 @@
 
 import { ToolRow, ToolListItem, ToolCard } from "@/components/ToolCard";
 import type { Tool } from "@/lib/types";
-import type { ViewMode } from "@/components/ViewToggle";
+import type { ViewMode } from "@/lib/types";
 
 const COL_HEADERS = [
   { label: "Tool", width: "200px" },

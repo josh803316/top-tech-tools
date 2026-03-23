@@ -35,6 +35,7 @@ export type Tool = {
 export type SortOption = "stars" | "trending" | "newest" | "installs";
 export type QualityLevel = "elite" | "high" | "mid" | "low";
 export type ActivityLevel = "hot" | "active" | "recent" | "stale";
+export type ViewMode = "table" | "list" | "cards";
 
 export type CuratedTool = {
   slug: string;

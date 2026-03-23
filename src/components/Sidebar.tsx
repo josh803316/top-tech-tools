@@ -1,10 +1,10 @@
 "use client";
 
 import { useSearchParams, usePathname, useRouter } from "next/navigation";
-import Link from "next/link";
-import { useCallback, useRef } from "react";
+import { useCallback } from "react";
+import { Terminal } from "lucide-react";
 import {
-  Search, FolderOpen, GitBranch, Terminal, FileText,
+  Search, FolderOpen, GitBranch, FileText,
   Cpu, Wifi, Zap, Box, Sparkles, Bot, Code, Monitor,
   Hash, Cloud, Layers, Package, GitCommit,
 } from "lucide-react";
@@ -19,17 +19,17 @@ const ICONS: Record<string, React.ElementType> = {
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
 const QUALITY_OPTIONS = [
-  { value: "elite", label: "Elite", sublabel: "10k+" },
-  { value: "high", label: "High", sublabel: "1k+" },
-  { value: "mid", label: "Mid", sublabel: "100+" },
-  { value: "low", label: "Low", sublabel: "<100" },
+  { value: "elite", label: "Elite 10k+" },
+  { value: "high", label: "High 1k–10k" },
+  { value: "mid", label: "Mid 100–1k" },
+  { value: "low", label: "Low <100" },
 ];
 
 const ACTIVITY_OPTIONS = [
-  { value: "hot", label: "Hot", sublabel: "<7d" },
-  { value: "active", label: "Active", sublabel: "<30d" },
-  { value: "recent", label: "Recent", sublabel: "<90d" },
-  { value: "stale", label: "Stale", sublabel: "90d+" },
+  { value: "hot", label: "Hot <7d" },
+  { value: "active", label: "Active <30d" },
+  { value: "recent", label: "Recent <90d" },
+  { value: "stale", label: "Stale 90d+" },
 ];
 
 const SORT_OPTIONS = [
@@ -54,7 +54,6 @@ export function Sidebar({ categories, counts }: SidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const inputRef = useRef<HTMLInputElement>(null);
 
   const get = (key: string) => searchParams.get(key) ?? "";
 
@@ -88,61 +87,90 @@ export function Sidebar({ categories, counts }: SidebarProps) {
         flexDirection: "column",
         overflowY: "auto",
         height: "100%",
-        gap: 0,
       }}
     >
-      {/* Search */}
-      <div style={{ padding: "14px 12px 10px" }}>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            update({ q: inputRef.current?.value ?? "" });
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              background: "var(--bg)",
-              border: "1px solid var(--border)",
-              borderRadius: "7px",
-              padding: "7px 10px",
-            }}
-          >
-            <Search size={13} color="var(--text-secondary)" />
-            <input
-              ref={inputRef}
-              defaultValue={get("q")}
-              placeholder="Search tools…"
-              style={{
-                background: "none",
-                border: "none",
-                outline: "none",
-                color: "var(--text-primary)",
-                fontSize: "13px",
-                width: "100%",
-              }}
-            />
-          </div>
-        </form>
+      {/* Header */}
+      <div style={{ padding: "14px 16px 10px" }}>
+        <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--text-muted)" }}>
+          Filters
+        </span>
       </div>
+
+      {/* Category */}
+      <Section label="Category">
+        <CheckRow
+          label="All"
+          checked={!activeCategory}
+          count={Object.values(counts.categories).reduce((a, b) => a + b, 0)}
+          onClick={() => update({ category: "" })}
+        />
+        {categories.map((cat) => {
+          const checked = activeCategory === cat.slug;
+          return (
+            <CheckRow
+              key={cat.slug}
+              label={cat.label}
+              checked={checked}
+              count={counts.categories[cat.slug] ?? 0}
+              onClick={() => update({ category: checked ? "" : cat.slug })}
+            />
+          );
+        })}
+      </Section>
+
+      <Divider />
+
+      {/* Quality */}
+      <Section label="Quality">
+        {QUALITY_OPTIONS.map((opt) => {
+          const checked = activeQuality === opt.value;
+          return (
+            <CheckRow
+              key={opt.value}
+              label={opt.label}
+              checked={checked}
+              count={counts.quality[opt.value] ?? 0}
+              onClick={() => update({ quality: checked ? "" : opt.value })}
+            />
+          );
+        })}
+      </Section>
+
+      <Divider />
+
+      {/* Activity */}
+      <Section label="Activity">
+        {ACTIVITY_OPTIONS.map((opt) => {
+          const checked = activeActivity === opt.value;
+          return (
+            <CheckRow
+              key={opt.value}
+              label={opt.label}
+              checked={checked}
+              count={counts.activity[opt.value] ?? 0}
+              onClick={() => update({ activity: checked ? "" : opt.value })}
+            />
+          );
+        })}
+      </Section>
 
       <Divider />
 
       {/* Sort */}
       <Section label="Sort by">
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px" }}>
-          {SORT_OPTIONS.map((opt) => (
-            <button
+        {SORT_OPTIONS.map((opt) => {
+          const checked = activeSort === opt.value;
+          return (
+            <CheckRow
               key={opt.value}
+              label={opt.label}
+              checked={checked}
+              count={null}
               onClick={() => update({ sort: opt.value === "stars" ? "" : opt.value })}
-              style={chipStyle(activeSort === opt.value)}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
+              radio
+            />
+          );
+        })}
       </Section>
 
       <Divider />
@@ -150,10 +178,7 @@ export function Sidebar({ categories, counts }: SidebarProps) {
       {/* A–Z */}
       <Section label="A – Z">
         <div style={{ display: "flex", flexWrap: "wrap", gap: "3px" }}>
-          <button
-            onClick={() => update({ letter: "" })}
-            style={letterStyle(!activeLetter)}
-          >
+          <button onClick={() => update({ letter: "" })} style={letterStyle(!activeLetter)}>
             All
           </button>
           {LETTERS.map((l) => (
@@ -168,128 +193,74 @@ export function Sidebar({ categories, counts }: SidebarProps) {
         </div>
       </Section>
 
-      <Divider />
-
-      {/* Category */}
-      <Section label="Category">
-        <nav style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
-          <Link
-            href={pathname === "/" ? "/" : `/?`}
-            onClick={(e) => { e.preventDefault(); update({ category: "" }); }}
-            style={catRowStyle(!activeCategory)}
-          >
-            <FolderOpen size={13} />
-            <span style={{ flex: 1 }}>All categories</span>
-          </Link>
-          {categories.map((cat) => {
-            const Icon = ICONS[cat.iconName] ?? Terminal;
-            const active = activeCategory === cat.slug;
-            const count = counts.categories[cat.slug];
-            return (
-              <a
-                key={cat.slug}
-                href="#"
-                onClick={(e) => { e.preventDefault(); update({ category: active ? "" : cat.slug }); }}
-                style={catRowStyle(active)}
-              >
-                <Icon size={13} />
-                <span style={{ flex: 1 }}>{cat.label}</span>
-                {count !== undefined && (
-                  <CountBadge value={count} active={active} />
-                )}
-              </a>
-            );
-          })}
-        </nav>
-      </Section>
-
-      <Divider />
-
-      {/* Quality */}
-      <Section label="Quality">
-        <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-          {QUALITY_OPTIONS.map((opt) => {
-            const active = activeQuality === opt.value;
-            const count = counts.quality[opt.value];
-            return (
-              <button
-                key={opt.value}
-                onClick={() => update({ quality: active ? "" : opt.value })}
-                style={facetRowStyle(active)}
-              >
-                <span style={{ flex: 1, textAlign: "left" }}>
-                  {opt.label}
-                  <span style={{ marginLeft: "5px", fontSize: "10px", color: active ? "rgba(79,131,255,0.7)" : "var(--text-muted)" }}>
-                    {opt.sublabel}
-                  </span>
-                </span>
-                {count !== undefined && <CountBadge value={count} active={active} />}
-              </button>
-            );
-          })}
-        </div>
-      </Section>
-
-      <Divider />
-
-      {/* Activity */}
-      <Section label="Activity">
-        <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-          {ACTIVITY_OPTIONS.map((opt) => {
-            const active = activeActivity === opt.value;
-            const count = counts.activity[opt.value];
-            return (
-              <button
-                key={opt.value}
-                onClick={() => update({ activity: active ? "" : opt.value })}
-                style={facetRowStyle(active)}
-              >
-                <span style={{ flex: 1, textAlign: "left" }}>
-                  {opt.label}
-                  <span style={{ marginLeft: "5px", fontSize: "10px", color: active ? "rgba(79,131,255,0.7)" : "var(--text-muted)" }}>
-                    {opt.sublabel}
-                  </span>
-                </span>
-                {count !== undefined && <CountBadge value={count} active={active} />}
-              </button>
-            );
-          })}
-        </div>
-      </Section>
-
       <div style={{ flex: 1 }} />
     </aside>
   );
 }
 
-function CountBadge({ value, active }: { value: number; active: boolean }) {
+function CheckRow({
+  label,
+  checked,
+  count,
+  onClick,
+  radio = false,
+}: {
+  label: string;
+  checked: boolean;
+  count: number | null;
+  onClick: () => void;
+  radio?: boolean;
+}) {
   return (
-    <span
+    <label
       style={{
-        fontSize: "10px",
-        fontWeight: 500,
-        color: active ? "var(--accent)" : "var(--text-muted)",
-        background: active ? "rgba(79,131,255,0.12)" : "rgba(255,255,255,0.04)",
+        display: "flex",
+        alignItems: "center",
+        gap: "8px",
+        padding: "4px 2px",
+        cursor: "pointer",
         borderRadius: "4px",
-        padding: "1px 5px",
-        minWidth: "24px",
-        textAlign: "center",
-        fontVariantNumeric: "tabular-nums",
       }}
     >
-      {value >= 1000 ? `${(value / 1000).toFixed(1)}k` : value}
-    </span>
+      <input
+        type={radio ? "radio" : "checkbox"}
+        checked={checked}
+        onChange={onClick}
+        style={{
+          accentColor: "var(--accent)",
+          width: "13px",
+          height: "13px",
+          flexShrink: 0,
+          cursor: "pointer",
+        }}
+      />
+      <span
+        style={{
+          flex: 1,
+          fontSize: "12px",
+          color: checked ? "var(--text-primary)" : "var(--text-secondary)",
+          fontWeight: checked ? 500 : 400,
+        }}
+      >
+        {label}
+      </span>
+      {count !== null && (
+        <span style={{ fontSize: "11px", color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}>
+          {count}
+        </span>
+      )}
+    </label>
   );
 }
 
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div style={{ padding: "10px 12px" }}>
+    <div style={{ padding: "10px 16px" }}>
       <div
         style={{
-          fontSize: "9px",
+          fontSize: "10px",
           fontWeight: 700,
-          letterSpacing: "0.12em",
+          letterSpacing: "0.1em",
           textTransform: "uppercase",
           color: "var(--text-muted)",
           marginBottom: "8px",
@@ -303,22 +274,7 @@ function Section({ label, children }: { label: string; children: React.ReactNode
 }
 
 function Divider() {
-  return <div style={{ height: "1px", background: "var(--border)", margin: "0 12px" }} />;
-}
-
-function chipStyle(active: boolean): React.CSSProperties {
-  return {
-    padding: "4px 9px",
-    borderRadius: "5px",
-    border: `1px solid ${active ? "rgba(79,131,255,0.4)" : "var(--border)"}`,
-    background: active ? "rgba(79,131,255,0.12)" : "transparent",
-    color: active ? "var(--accent)" : "var(--text-secondary)",
-    fontSize: "11px",
-    fontWeight: active ? 500 : 400,
-    cursor: "pointer",
-    whiteSpace: "nowrap" as const,
-    transition: "all 0.12s",
-  };
+  return <div style={{ height: "1px", background: "var(--border)", margin: "0 16px" }} />;
 }
 
 function letterStyle(active: boolean): React.CSSProperties {
@@ -336,40 +292,5 @@ function letterStyle(active: boolean): React.CSSProperties {
     fontWeight: active ? 600 : 400,
     cursor: "pointer",
     transition: "all 0.1s",
-  };
-}
-
-function catRowStyle(active: boolean): React.CSSProperties {
-  return {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    padding: "5px 7px",
-    borderRadius: "5px",
-    fontSize: "12px",
-    fontWeight: active ? 500 : 400,
-    color: active ? "var(--text-primary)" : "var(--text-secondary)",
-    background: active ? "var(--accent-dim)" : "transparent",
-    cursor: "pointer",
-    transition: "all 0.12s",
-    textDecoration: "none",
-  };
-}
-
-function facetRowStyle(active: boolean): React.CSSProperties {
-  return {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    padding: "5px 7px",
-    borderRadius: "5px",
-    fontSize: "12px",
-    fontWeight: active ? 500 : 400,
-    color: active ? "var(--text-primary)" : "var(--text-secondary)",
-    background: active ? "var(--accent-dim)" : "transparent",
-    border: "none",
-    cursor: "pointer",
-    transition: "all 0.12s",
-    width: "100%",
   };
 }
