@@ -75,3 +75,92 @@ a {
 .collection-hover:hover {
   border-color: rgba(79, 131, 255, 0.3) !important;
 }
+
+/* ── Layout shell ─────────────────────────────────────────────────────────── */
+
+.layout-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.sidebar-wrapper {
+  width: var(--sidebar-width);
+  flex-shrink: 0;
+  height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  z-index: 100;
+}
+
+.main-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-width: 0;
+}
+
+.sidebar-overlay {
+  display: none;
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────────── */
+
+.hide-mobile  { }
+.show-mobile  { display: none !important; }
+
+@media (max-width: 767px) {
+  /* Sidebar becomes a fixed left drawer */
+  .sidebar-wrapper {
+    position: fixed;
+    top: var(--header-height);
+    left: 0;
+    width: 280px;
+    height: calc(100vh - var(--header-height));
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    z-index: 300;
+    overflow-y: auto;
+  }
+
+  .sidebar-wrapper.open {
+    transform: translateX(0);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.4);
+  }
+
+  .sidebar-overlay.visible {
+    display: block;
+    position: fixed;
+    inset: 0;
+    top: var(--header-height);
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 299;
+  }
+
+  .hide-mobile  { display: none !important; }
+  .show-mobile  { display: flex !important; }
+
+  /* Table: hide less-important columns */
+  .col-optional { display: none; }
+
+  /* Cards: single column on phones */
+  .cards-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (min-width: 480px) and (max-width: 767px) {
+  /* Two-column cards on larger phones */
+  .cards-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+@media (min-width: 768px) {
+  /* Hamburger hidden on desktop */
+  .hamburger-btn { display: none !important; }
+}

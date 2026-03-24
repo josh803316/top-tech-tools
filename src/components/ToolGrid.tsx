@@ -5,13 +5,13 @@ import type { Tool } from "@/lib/types";
 import type { ViewMode } from "@/lib/types";
 
 const COL_HEADERS = [
-  { label: "Tool", width: "200px" },
-  { label: "What it solves" },
-  { label: "Stars", width: "72px" },
-  { label: "Activity", width: "80px" },
-  { label: "Version", width: "72px" },
-  { label: "Installs", width: "80px" },
-  { label: "", width: "48px" },
+  { label: "Tool",         width: "200px", cls: "" },
+  { label: "What it solves",               cls: "" },
+  { label: "Stars",        width: "72px",  cls: "col-optional" },
+  { label: "Activity",     width: "80px",  cls: "col-optional" },
+  { label: "Version",      width: "72px",  cls: "col-optional" },
+  { label: "Installs",     width: "80px",  cls: "col-optional" },
+  { label: "",             width: "48px",  cls: "col-optional" },
 ];
 
 const EMPTY = (
@@ -20,12 +20,13 @@ const EMPTY = (
   </div>
 );
 
-export function ToolTable({ tools, view = "table" }: { tools: Tool[]; view?: ViewMode }) {
+export function ToolTable({ tools, view = "cards" }: { tools: Tool[]; view?: ViewMode }) {
   if (tools.length === 0) return EMPTY;
 
   if (view === "cards") {
     return (
       <div
+        className="cards-grid"
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
@@ -46,7 +47,7 @@ export function ToolTable({ tools, view = "table" }: { tools: Tool[]; view?: Vie
     );
   }
 
-  // table (default)
+  // table (default fallback)
   return (
     <table style={{ width: "100%", borderCollapse: "collapse" }}>
       <thead>
@@ -54,6 +55,7 @@ export function ToolTable({ tools, view = "table" }: { tools: Tool[]; view?: Vie
           {COL_HEADERS.map((col, i) => (
             <th
               key={i}
+              className={col.cls}
               style={{
                 padding: i === 0 ? "8px 12px 8px 16px" : "8px 16px 8px 0",
                 textAlign: "left",

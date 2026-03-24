@@ -72,16 +72,19 @@ export function Header() {
         TOP TECH TOOLS
       </Link>
 
-      {/* Nav tabs */}
+      {/* Nav tabs — hidden on mobile */}
       <Suspense>
-        <NavTabs />
+        <div className="hide-mobile" style={{ display: "flex" }}>
+          <NavTabs />
+        </div>
       </Suspense>
 
       {/* Spacer */}
       <div style={{ flex: 1 }} />
 
-      {/* Search */}
+      {/* Search — hidden on mobile (toolbar has it) */}
       <div
+        className="hide-mobile"
         style={{
           display: "flex",
           alignItems: "center",
@@ -100,12 +103,12 @@ export function Header() {
         </span>
       </div>
 
-      {/* Icons */}
-      <Bell size={16} color="var(--text-secondary)" style={{ cursor: "pointer" }} />
+      {/* Bell — hidden on mobile */}
+      <Bell size={16} color="var(--text-secondary)" className="hide-mobile" style={{ cursor: "pointer" }} />
 
       {/* CTA */}
       <Link
-        href="#"
+        href="/submit"
         style={{
           display: "flex",
           alignItems: "center",
@@ -119,7 +122,7 @@ export function Header() {
           whiteSpace: "nowrap",
         }}
       >
-        Submit a Tool
+        <span className="hide-mobile">Submit a Tool</span>
         <ArrowUpRight size={13} />
       </Link>
     </header>

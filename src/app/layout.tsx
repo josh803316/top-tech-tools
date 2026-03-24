@@ -1,8 +1,9 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
 import "./globals.css";
 import { Header } from "@/components/Header";
 import { Sidebar } from "@/components/Sidebar";
+import { LayoutShell } from "@/components/LayoutShell";
 import { getAllCategories, getFilterCounts } from "@/lib/queries/tools";
 
 export const metadata: Metadata = {
@@ -10,8 +11,19 @@ export const metadata: Metadata = {
   description: "Discover and rank the best tools in the entire tech stack — AI models, editors, terminals, cloud platforms, container tools, and more.",
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
+
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const [categories, counts] = await Promise.all([getAllCategories(), getFilterCounts()]);
+
+  const sidebar = (
+    <Suspense fallback={<div style={{ width: "var(--sidebar-width)", background: "var(--surface)" }} />}>
+      <Sidebar categories={categories} counts={counts} />
+    </Suspense>
+  );
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -26,20 +38,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body>
         <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
           <Header />
-          <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-            <Suspense fallback={<div style={{ width: "var(--sidebar-width)", flexShrink: 0, background: "var(--surface)", borderRight: "1px solid var(--border)" }} />}>
-              <Sidebar categories={categories} counts={counts} />
-            </Suspense>
-            <main
-              style={{
-                flex: 1,
-                overflowY: "auto",
-                overflowX: "hidden",
-              }}
-            >
-              {children}
-            </main>
-          </div>
+          <LayoutShell sidebar={sidebar}>
+            {children}
+          </LayoutShell>
         </div>
       </body>
     </html>

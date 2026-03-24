@@ -245,21 +245,21 @@ export function ToolRow({ tool }: { tool: Tool }) {
         </Link>
       </td>
       {/* Stars */}
-      <td style={{ padding: "10px 16px 10px 0", verticalAlign: "middle", width: "72px", whiteSpace: "nowrap" }}>
+      <td className="col-optional" style={{ padding: "10px 16px 10px 0", verticalAlign: "middle", width: "72px", whiteSpace: "nowrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "4px", color: "var(--text-secondary)", fontSize: "12px" }}>
           <Star size={11} fill="currentColor" />
           {fmt(tool.stars)}
         </div>
       </td>
       {/* Activity */}
-      <td style={{ padding: "10px 16px 10px 0", verticalAlign: "middle", width: "80px", whiteSpace: "nowrap" }}>
+      <td className="col-optional" style={{ padding: "10px 16px 10px 0", verticalAlign: "middle", width: "80px", whiteSpace: "nowrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "11px" }}>
           <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: activity.color, flexShrink: 0 }} />
           <span style={{ color: activity.color, fontWeight: 500 }}>{activity.label}</span>
         </div>
       </td>
       {/* Version */}
-      <td style={{ padding: "10px 16px 10px 0", verticalAlign: "middle", width: "72px", whiteSpace: "nowrap" }}>
+      <td className="col-optional" style={{ padding: "10px 16px 10px 0", verticalAlign: "middle", width: "72px", whiteSpace: "nowrap" }}>
         {tool.currentVersion ? (
           <span style={{ fontSize: "11px", color: "var(--text-muted)", fontFamily: "monospace" }}>
             v{tool.currentVersion}
@@ -267,7 +267,7 @@ export function ToolRow({ tool }: { tool: Tool }) {
         ) : null}
       </td>
       {/* Installs */}
-      <td style={{ padding: "10px 16px 10px 0", verticalAlign: "middle", width: "80px", whiteSpace: "nowrap" }}>
+      <td className="col-optional" style={{ padding: "10px 16px 10px 0", verticalAlign: "middle", width: "80px", whiteSpace: "nowrap" }}>
         {tool.installsLast30d > 0 ? (
           <div style={{ display: "flex", alignItems: "center", gap: "4px", color: "var(--text-secondary)", fontSize: "11px" }}>
             <Package size={10} />
@@ -276,7 +276,7 @@ export function ToolRow({ tool }: { tool: Tool }) {
         ) : null}
       </td>
       {/* Links */}
-      <td style={{ padding: "10px 16px 10px 0", verticalAlign: "middle", width: "48px" }}>
+      <td className="col-optional" style={{ padding: "10px 16px 10px 0", verticalAlign: "middle", width: "48px" }}>
         <div style={{ display: "flex", gap: "8px" }}>
           {tool.githubUrl && (
             <a href={tool.githubUrl} target="_blank" rel="noopener noreferrer"

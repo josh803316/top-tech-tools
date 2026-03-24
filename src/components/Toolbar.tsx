@@ -2,8 +2,9 @@
 
 import { useSearchParams, usePathname, useRouter } from "next/navigation";
 import { useCallback, useRef } from "react";
-import { Menu, Search } from "lucide-react";
+import { Menu, Search, List, Table2, LayoutGrid } from "lucide-react";
 import type { ViewMode } from "@/lib/types";
+import { useSidebar } from "@/components/SidebarContext";
 
 const VIEWS: { value: ViewMode; label: string }[] = [
   { value: "list", label: "List" },
@@ -16,11 +17,18 @@ type ToolbarProps = {
   total: number;
 };
 
+const VIEW_ICONS: Record<ViewMode, React.ElementType> = {
+  list: List,
+  table: Table2,
+  cards: LayoutGrid,
+};
+
 export function Toolbar({ active, total }: ToolbarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const inputRef = useRef<HTMLInputElement>(null);
+  const { toggle } = useSidebar();
 
   const update = useCallback(
     (updates: Record<string, string>) => {
@@ -50,8 +58,10 @@ export function Toolbar({ active, total }: ToolbarProps) {
         flexShrink: 0,
       }}
     >
-      {/* Hamburger (decorative for now) */}
+      {/* Hamburger — mobile only */}
       <button
+        className="hamburger-btn"
+        onClick={toggle}
         style={{
           display: "flex",
           alignItems: "center",
@@ -105,7 +115,7 @@ export function Toolbar({ active, total }: ToolbarProps) {
         </div>
       </form>
 
-      {/* View toggle */}
+      {/* View toggle — text labels on desktop, icons on mobile */}
       <div
         style={{
           display: "flex",
@@ -115,30 +125,40 @@ export function Toolbar({ active, total }: ToolbarProps) {
           flexShrink: 0,
         }}
       >
-        {VIEWS.map(({ value, label }, i) => (
-          <button
-            key={value}
-            onClick={() => setView(value)}
-            style={{
-              padding: "6px 14px",
-              fontSize: "13px",
-              fontWeight: active === value ? 600 : 400,
-              background: active === value ? "var(--text-primary)" : "transparent",
-              color: active === value ? "var(--bg)" : "var(--text-secondary)",
-              border: "none",
-              borderLeft: i > 0 ? "1px solid var(--border)" : "none",
-              cursor: "pointer",
-              transition: "all 0.12s",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {label}
-          </button>
-        ))}
+        {VIEWS.map(({ value, label }, i) => {
+          const Icon = VIEW_ICONS[value];
+          return (
+            <button
+              key={value}
+              onClick={() => setView(value)}
+              title={label}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "5px",
+                padding: "6px 14px",
+                fontSize: "13px",
+                fontWeight: active === value ? 600 : 400,
+                background: active === value ? "var(--text-primary)" : "transparent",
+                color: active === value ? "var(--bg)" : "var(--text-secondary)",
+                border: "none",
+                borderLeft: i > 0 ? "1px solid var(--border)" : "none",
+                cursor: "pointer",
+                transition: "all 0.12s",
+                whiteSpace: "nowrap",
+              }}
+            >
+              <Icon size={14} className="show-mobile" style={{ display: "none" }} />
+              <span className="hide-mobile">{label}</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Count */}
       <span
+        className="hide-mobile"
         style={{
           fontSize: "13px",
           color: "var(--text-muted)",
