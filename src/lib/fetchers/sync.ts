@@ -3,6 +3,7 @@ import { tools, categories, toolCategories } from "@/lib/db/schema";
 import { CURATED_TOOLS, CURATED_CATEGORIES } from "@/lib/seed/curated-tools";
 import { fetchGitHubRepo, computeTrendingScore } from "./github";
 import { fetchBrewFormula, getBrewInstalls30d } from "./brew";
+import { discoverNewTools, type DiscoveredTool } from "./discover";
 import { eq } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
@@ -23,6 +24,29 @@ export async function syncAllTools(): Promise<{ synced: number; errors: string[]
     }
     // Stagger to avoid GitHub rate limit bursts
     await new Promise((r) => setTimeout(r, 150));
+  }
+
+  // Auto-discover new tools from GitHub topic search
+  try {
+    const curatedSlugs = new Set(CURATED_TOOLS.map((t) => t.slug));
+
+    // Also include slugs already in DB to avoid re-inserting discovered tools
+    const existingInDb = await db.query.tools.findMany({ columns: { slug: true } });
+    for (const row of existingInDb) curatedSlugs.add(row.slug);
+
+    const discovered = await discoverNewTools(curatedSlugs);
+
+    for (const tool of discovered) {
+      try {
+        await syncDiscoveredTool(tool, brewInstalls);
+        synced++;
+      } catch (err) {
+        errors.push(`[discovered] ${tool.slug}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+      await new Promise((r) => setTimeout(r, 150));
+    }
+  } catch (err) {
+    errors.push(`[discovery] ${err instanceof Error ? err.message : String(err)}`);
   }
 
   return { synced, errors };
@@ -93,6 +117,75 @@ async function syncTool(
   let toolId: string;
   if (existing) {
     await db.update(tools).set(toolData).where(eq(tools.slug, tool.slug));
+    toolId = existing.id;
+  } else {
+    toolId = randomUUID();
+    await db.insert(tools).values({ id: toolId, ...toolData });
+  }
+
+  // Sync category associations
+  const catRecords = await db.query.categories.findMany();
+  const catMap = new Map(catRecords.map((c) => [c.slug, c.id]));
+
+  await db.delete(toolCategories).where(eq(toolCategories.toolId, toolId));
+  for (const catSlug of tool.categories) {
+    const catId = catMap.get(catSlug);
+    if (catId) {
+      await db.insert(toolCategories).values({ toolId, categoryId: catId });
+    }
+  }
+}
+
+async function syncDiscoveredTool(
+  tool: DiscoveredTool,
+  brewInstalls: Map<string, number>
+) {
+  const githubData = await fetchGitHubRepo(tool.githubOwner, tool.githubRepo);
+
+  const stars = githubData?.stargazers_count ?? tool.stars;
+  const pushedAt = githubData?.pushed_at ?? tool.pushedAt;
+  const trendingScore = computeTrendingScore(stars, pushedAt);
+  const githubUrl = `https://github.com/${tool.githubOwner}/${tool.githubRepo}`;
+
+  const toolData = {
+    slug: tool.slug,
+    name: githubData ? tool.githubRepo : tool.name,
+    description: githubData?.description || tool.description || "",
+    githubOwner: tool.githubOwner,
+    githubRepo: tool.githubRepo,
+    githubUrl,
+    websiteUrl: githubUrl,
+    stars,
+    forks: githubData?.forks_count ?? 0,
+    openIssues: githubData?.open_issues_count ?? 0,
+    githubTopics: githubData?.topics ?? tool.topics,
+    lastPushedAt: pushedAt ? new Date(pushedAt) : null,
+    brewName: null,
+    brewUrl: null,
+    installsLast30d: 0,
+    currentVersion: null,
+    featured: false,
+    trendingScore,
+    updatedAt: new Date(),
+    dataFetchedAt: new Date(),
+  };
+
+  const existing = await db.query.tools.findFirst({
+    where: eq(tools.slug, tool.slug),
+  });
+
+  let toolId: string;
+  if (existing) {
+    // Only update metrics for discovered tools; don't overwrite curated metadata
+    await db.update(tools).set({
+      stars: toolData.stars,
+      forks: toolData.forks,
+      openIssues: toolData.openIssues,
+      lastPushedAt: toolData.lastPushedAt,
+      trendingScore: toolData.trendingScore,
+      updatedAt: toolData.updatedAt,
+      dataFetchedAt: toolData.dataFetchedAt,
+    }).where(eq(tools.slug, tool.slug));
     toolId = existing.id;
   } else {
     toolId = randomUUID();
