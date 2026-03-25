@@ -13,12 +13,13 @@ const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 // Each query string is passed directly as the `q` param to GitHub search.
 const CATEGORY_TOPIC_QUERIES: Record<string, string[]> = {
   shells: [
-    "topic:shell topic:zsh",
+    "topic:zsh-plugin",
+    "topic:zsh-theme",
     "topic:bash-framework",
-    "topic:fish-shell",
+    "topic:fish-shell topic:plugin",
     "topic:terminal-multiplexer",
     "topic:shell-history",
-    "topic:prompt",
+    "topic:shell-prompt",
   ],
   terminals: [
     "topic:terminal-emulator",
@@ -196,7 +197,7 @@ function inferCategories(topics: string[], originCategory: string): string[] {
 
   const topicSet = new Set(topics.map((t) => t.toLowerCase()));
 
-  if (topicSet.has("zsh") || topicSet.has("bash") || topicSet.has("fish-shell") || topicSet.has("shell")) {
+  if (topicSet.has("zsh-plugin") || topicSet.has("zsh-theme") || topicSet.has("fish-plugin") || topicSet.has("bash-framework") || topicSet.has("shell-prompt") || topicSet.has("shell-history") || topicSet.has("terminal-multiplexer")) {
     cats.add("shells");
   }
   if (topicSet.has("terminal-emulator") || topicSet.has("terminal")) {
