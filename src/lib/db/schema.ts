@@ -31,6 +31,7 @@ export const tools = pgTable(
     currentVersion: text("current_version"),
     featured: boolean("featured").notNull().default(false),
     trendingScore: real("trending_score").notNull().default(0),
+    starGrowthPct7d: real("star_growth_pct_7d"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
     dataFetchedAt: timestamp("data_fetched_at"),
@@ -40,6 +41,27 @@ export const tools = pgTable(
     index("tools_trending_score_idx").on(table.trendingScore),
     index("tools_installs_last_30d_idx").on(table.installsLast30d),
     index("tools_created_at_idx").on(table.createdAt),
+    index("tools_star_growth_pct_7d_idx").on(table.starGrowthPct7d),
+  ]
+);
+
+export const toolMetricsHistory = pgTable(
+  "tool_metrics_history",
+  {
+    id: text("id").primaryKey().notNull(),
+    toolId: text("tool_id")
+      .notNull()
+      .references(() => tools.id, { onDelete: "cascade" }),
+    capturedAt: timestamp("captured_at").notNull().defaultNow(),
+    stars: integer("stars"),
+    forks: integer("forks"),
+    installsLast30d: integer("installs_last_30d"),
+  },
+  (table) => [
+    index("tool_metrics_history_tool_id_captured_at_idx").on(
+      table.toolId,
+      table.capturedAt
+    ),
   ]
 );
 

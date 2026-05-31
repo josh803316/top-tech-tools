@@ -189,11 +189,53 @@ export async function discoverNewTools(
 }
 
 /**
- * Infer which categories a repo belongs to based on its GitHub topics.
- * Always includes the category from the originating query.
+ * Parse `{ owner, repo }` pairs out of a list of github.com URLs.
+ *
+ * Lets an integrator fold externally-sourced github links (e.g. from
+ * Hacker News discovery) into the discovery flow without this module
+ * needing to know where the URLs came from. Non-github URLs are skipped;
+ * trailing slashes and extra path segments are tolerated; results are
+ * deduplicated on `owner/repo`.
  */
-function inferCategories(topics: string[], originCategory: string): string[] {
-  const cats = new Set<string>([originCategory]);
+export function githubCandidatesFromUrls(
+  urls: string[]
+): Array<{ owner: string; repo: string }> {
+  const seen = new Set<string>();
+  const out: Array<{ owner: string; repo: string }> = [];
+
+  for (const raw of urls) {
+    let parsed: URL;
+    try {
+      parsed = new URL(raw);
+    } catch {
+      continue;
+    }
+    if (parsed.hostname !== "github.com" && parsed.hostname !== "www.github.com") {
+      continue;
+    }
+    const parts = parsed.pathname.split("/").filter(Boolean);
+    if (parts.length < 2) continue;
+
+    const owner = parts[0];
+    const repo = parts[1].replace(/\.git$/, "");
+    const key = `${owner}/${repo}`.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    out.push({ owner, repo });
+  }
+
+  return out;
+}
+
+/**
+ * Infer which categories a repo belongs to based on its GitHub topics.
+ * Includes the originating query's category when provided (topic-crawl path);
+ * for externally-sourced candidates (e.g. Hacker News) call without an origin
+ * to get purely topic-matched categories.
+ */
+export function inferCategories(topics: string[], originCategory?: string): string[] {
+  const cats = new Set<string>(originCategory ? [originCategory] : []);
 
   const topicSet = new Set(topics.map((t) => t.toLowerCase()));
 

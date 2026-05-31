@@ -24,6 +24,10 @@ function formatTool(tool: RawTool, cats: RawCategory[]): Tool {
   };
 }
 
+// `growth` is a sort option exposed by the query layer ahead of the shared
+// `SortOption` union (defined in @/lib/types, owned elsewhere). It sorts by the
+// 7-day star-growth velocity column with NULLS LAST + a stars tiebreak, handled
+// in a dedicated orderBy branch below.
 const ORDER_BY: Record<SortOption, Parameters<typeof desc>[0]> = {
   stars: tools.stars,
   trending: tools.trendingScore,
@@ -41,7 +45,7 @@ export async function getTools({
   cursor,
   limit = 48,
 }: {
-  sort?: SortOption;
+  sort?: SortOption | "growth";
   category?: string;
   q?: string;
   quality?: QualityLevel;
@@ -66,8 +70,13 @@ export async function getTools({
     }
   }
 
-  // Build query
-  const orderCol = ORDER_BY[sort];
+  // Build query. `growth` sorts by 7-day star velocity (NULLS LAST) with a stars
+  // tiebreak; all other sorts use a single column from ORDER_BY.
+  const orderCol = sort === "growth" ? null : ORDER_BY[sort];
+  const orderBy =
+    orderCol === null
+      ? [sql`${tools.starGrowthPct7d} DESC NULLS LAST`, desc(tools.stars), asc(tools.id)]
+      : [desc(orderCol), asc(tools.id)];
   const conditions = [];
 
   if (q) {
@@ -109,7 +118,7 @@ export async function getTools({
 
   const rows = await db.query.tools.findMany({
     where,
-    orderBy: [desc(orderCol), asc(tools.id)],
+    orderBy,
     limit: limit + 1,
   });
 
