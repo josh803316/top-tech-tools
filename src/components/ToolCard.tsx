@@ -10,9 +10,14 @@ export function fmt(n: number): string {
   return n.toString();
 }
 
-function activityInfo(lastPushedAt: string | null): { label: string; color: string; bg: string } {
+// `nowMs` is a STABLE reference time (the tool's last-sync timestamp), NOT
+// Date.now(). Using the live clock here makes the ISR-cached server HTML and
+// the later client hydration disagree (a repo can cross a freshness boundary in
+// the gap), which throws React hydration error #418 and breaks client
+// interactivity — notably the search box silently stops filtering.
+function activityInfo(lastPushedAt: string | null, nowMs: number): { label: string; color: string; bg: string } {
   if (!lastPushedAt) return { label: "unknown", color: "var(--text-muted)", bg: "rgba(255,255,255,0.05)" };
-  const days = (Date.now() - new Date(lastPushedAt).getTime()) / 86400000;
+  const days = (nowMs - new Date(lastPushedAt).getTime()) / 86400000;
   if (days < 7)  return { label: "hot",    color: "#22c55e", bg: "rgba(34,197,94,0.12)" };
   if (days < 30) return { label: "active", color: "#4f83ff", bg: "rgba(79,131,255,0.12)" };
   if (days < 90) return { label: "recent", color: "#f59e0b", bg: "rgba(245,158,11,0.12)" };
@@ -27,8 +32,8 @@ function starRating(stars: number): number {
   return 1;
 }
 
-function toolAge(createdAt: string): string {
-  const years = Math.floor((Date.now() - new Date(createdAt).getTime()) / (365.25 * 86400000));
+function toolAge(createdAt: string, nowMs: number): string {
+  const years = Math.floor((nowMs - new Date(createdAt).getTime()) / (365.25 * 86400000));
   if (years < 1) return "<1y old";
   return `${years}y old`;
 }
@@ -45,7 +50,8 @@ function Stars({ n }: { n: number }) {
 // ─── Rich Card (default/cards view) ─────────────────────────────────────────
 
 export function ToolCard({ tool }: { tool: Tool }) {
-  const activity = activityInfo(tool.lastPushedAt);
+  const nowMs = new Date(tool.dataFetchedAt ?? tool.updatedAt).getTime();
+  const activity = activityInfo(tool.lastPushedAt, nowMs);
 
   return (
     <Link
@@ -99,7 +105,7 @@ export function ToolCard({ tool }: { tool: Tool }) {
           ? <StatCell icon={<Package size={12} color="var(--text-muted)" />} label={`${fmt(tool.installsLast30d)}/mo`} />
           : <StatCell icon={null} label={tool.currentVersion ? `v${tool.currentVersion}` : ""} muted />
         }
-        <StatCell icon={null} label={toolAge(tool.createdAt)} muted />
+        <StatCell icon={null} label={toolAge(tool.createdAt, nowMs)} muted />
         {tool.featured && <StatCell icon={null} label="featured" accent />}
       </div>
 
@@ -115,16 +121,21 @@ export function ToolCard({ tool }: { tool: Tool }) {
       >
         <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
           {tool.githubUrl && (
-            <a
-              href={tool.githubUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              style={{ color: "var(--text-muted)", fontSize: "11px", display: "flex", alignItems: "center", gap: "3px", textDecoration: "none" }}
+            // NOT an <a>: the whole card is already a <Link> (an <a>), and an
+            // <a> inside an <a> is invalid HTML — the browser reparents it,
+            // which makes the client DOM differ from the server HTML and throws
+            // React hydration error #418 (breaking client interactivity such as
+            // the search box). Render a role="link" span that opens the repo.
+            <span
+              role="link"
+              tabIndex={0}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(tool.githubUrl!, "_blank", "noopener,noreferrer"); }}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); window.open(tool.githubUrl!, "_blank", "noopener,noreferrer"); } }}
+              style={{ color: "var(--text-muted)", fontSize: "11px", display: "flex", alignItems: "center", gap: "3px", textDecoration: "none", cursor: "pointer" }}
             >
               <ExternalLink size={11} />
               GitHub
-            </a>
+            </span>
           )}
         </div>
         <Stars n={tool.stars} />
@@ -165,7 +176,8 @@ function StatCell({
 // ─── List item (compact single-row) ─────────────────────────────────────────
 
 export function ToolListItem({ tool }: { tool: Tool }) {
-  const activity = activityInfo(tool.lastPushedAt);
+  const nowMs = new Date(tool.dataFetchedAt ?? tool.updatedAt).getTime();
+  const activity = activityInfo(tool.lastPushedAt, nowMs);
   return (
     <Link
       href={`/tool/${tool.slug}`}
@@ -214,7 +226,8 @@ export function ToolListItem({ tool }: { tool: Tool }) {
 // ─── Table row ───────────────────────────────────────────────────────────────
 
 export function ToolRow({ tool }: { tool: Tool }) {
-  const activity = activityInfo(tool.lastPushedAt);
+  const nowMs = new Date(tool.dataFetchedAt ?? tool.updatedAt).getTime();
+  const activity = activityInfo(tool.lastPushedAt, nowMs);
 
   return (
     <tr className="row-hover" style={{ borderBottom: "1px solid var(--border)", cursor: "pointer" }}>
