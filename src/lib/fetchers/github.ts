@@ -45,64 +45,119 @@ export async function fetchGitHubRepo(
 }
 
 /**
- * Blended, velocity-weighted trending score. Higher = more trending.
+ * Map a Product Hunt rank (1 = best) to a normalized 0..100 social score.
+ * #1 → 100, fading ~2 points per rank, floored at 0 beyond the top ~50.
+ */
+export function phRankToSocialScore(phRank: number): number {
+  if (!Number.isFinite(phRank) || phRank < 1) return 0;
+  return Math.max(0, 100 - (phRank - 1) * 2);
+}
+
+/**
+ * Blended trending score for the NEWCOMER surface. Higher = hotter right now.
  *
- * Rationale: trending should reward MOMENTUM and CROSS-SOURCE CONSENSUS, not raw
- * size or pure recency. A huge but flat repo that happens to have a recent commit
- * should NOT outrank a smaller repo that's actually accelerating. We blend three
- * additive terms so the score degrades gracefully as signals appear/disappear:
+ * Trending is explicitly NOT Explore: it rewards MOMENTUM, CROSS-SOURCE HEAT, and
+ * FRESHNESS — never raw size. Raw stars are demoted to a tiny tiebreak so a flat
+ * mega-repo can't float to the top, and a brand-new product with zero GitHub stars
+ * can still win on social heat alone. Additive terms degrade gracefully as signals
+ * appear/disappear:
  *
- *   1. growthTerm   (DOMINANT when present): 7-day star-growth percent. This is the
- *      truest velocity signal — when we have it, it should drive the ranking.
- *   2. activityTerm (weak): a recency signal from pushedAt, intentionally capped and
- *      log-damped so a fresh push can nudge but never auto-top a real grower.
- *   3. phBonus      (consensus): a Product Hunt placement bonus — a second source
- *      agreeing a tool is hot. Better (smaller) phRank => bigger bonus.
+ *   1. growthTerm   (dominant): 7-day star-growth %, the truest velocity signal.
+ *   2. socialTerm   (dominant): normalized 0..100 cross-source heat (PH votes /
+ *      HN points / Reddit upvotes). Lets products with no repo rank.
+ *   3. freshnessTerm: decays with days since we first discovered it, so a freshly
+ *      surfaced tool surfaces immediately — before any velocity history exists.
+ *   4. starTie      (tiny): log-damped stars * 0.5, breaks ties only.
  *
- * Fallback: when growth & phRank are both null we still produce a sane, finite,
- * positive number from a log-damped stars base + the (weak) activity term — NOT a
- * pure-recency score, so big-but-stale repos don't rocket on a single commit.
+ * `phRank` is accepted as a convenience alias and folded into the social term.
  */
 export function computeTrendingScore(input: {
   stars: number;
   pushedAt: string | null;
   starGrowthPct7d?: number | null;
+  socialScore?: number | null;
+  firstSeenAt?: string | Date | null;
   phRank?: number | null;
 }): number {
-  const { stars, pushedAt, starGrowthPct7d, phRank } = input;
+  const { stars, starGrowthPct7d, socialScore, firstSeenAt, phRank } = input;
 
   const safeStars = Number.isFinite(stars) && stars > 0 ? stars : 0;
-  // Log-damped popularity base: keeps mega-repos from dominating purely on size,
-  // but still lets stars break ties. ~ 0..3+ for 0..thousands of stars.
-  const starBase = Math.log10(safeStars + 1);
+  // Tiny tiebreak only — never a ranking driver. ~1.9 at 6k stars.
+  const starTie = Math.log10(safeStars + 1) * 0.5;
 
   // 1) Growth term (dominant). Each +1% weekly growth adds a meaningful chunk.
   //    Clamp to avoid a single anomalous data point exploding the score.
   let growthTerm = 0;
   if (starGrowthPct7d != null && Number.isFinite(starGrowthPct7d)) {
     const g = Math.max(-50, Math.min(starGrowthPct7d, 500));
-    growthTerm = g * 2; // dominant weight
+    growthTerm = g * 2;
   }
 
-  // 2) Activity term (weak). Decays with days since last push; capped so a fresh
-  //    commit alone can't top a real grower. Scaled by the log star base so a tiny
-  //    abandoned repo with a recent commit stays near the bottom.
-  let activityTerm = 0;
-  if (pushedAt) {
-    const days = (Date.now() - new Date(pushedAt).getTime()) / 86_400_000;
+  // 2) Social term (dominant). Normalized 0..100 cross-source heat; PH rank folds
+  //    in when an explicit socialScore wasn't supplied.
+  let effectiveSocial = 0;
+  if (socialScore != null && Number.isFinite(socialScore)) {
+    effectiveSocial = Math.max(0, Math.min(socialScore, 100));
+  } else if (phRank != null) {
+    effectiveSocial = phRankToSocialScore(phRank);
+  }
+  const socialTerm = effectiveSocial;
+
+  // 3) Freshness term. Decays from ~25 (just discovered) toward 0 over weeks, so a
+  //    newly surfaced tool ranks even before velocity/social data accrues.
+  let freshnessTerm = 0;
+  if (firstSeenAt != null) {
+    const seen = firstSeenAt instanceof Date ? firstSeenAt.getTime() : new Date(firstSeenAt).getTime();
+    const days = (Date.now() - seen) / 86_400_000;
     if (Number.isFinite(days)) {
-      // ~10 at 0 days, ~5 at ~30 days, trailing off; weak vs. growth*2.
-      const recency = 10 / Math.pow(Math.max(days, 0) / 30 + 1, 1.2);
-      activityTerm = recency * (0.5 + 0.5 * Math.min(starBase, 3) / 3);
+      freshnessTerm = 25 / (Math.max(days, 0) / 7 + 1);
     }
   }
 
-  // 3) Product Hunt consensus bonus. #1 best; bonus shrinks with worse rank,
-  //    zero beyond the top ~50. Multi-source agreement that a tool is hot.
-  let phBonus = 0;
-  if (phRank != null && Number.isFinite(phRank) && phRank >= 1) {
-    phBonus = Math.max(0, 50 - (phRank - 1));
-  }
+  return growthTerm + socialTerm + freshnessTerm + starTie;
+}
 
-  return growthTerm + activityTerm + phBonus + starBase;
+// --- Trending eligibility (newcomer gate) -----------------------------------
+
+/** A discovered tool stays in Trending while it's this young (days). */
+export const TRENDING_WINDOW_DAYS = 120;
+/** A fresh social signal keeps a tool in Trending for this long (days). */
+export const SIGNAL_WINDOW_DAYS = 30;
+/** 7-day star growth at/above this % counts as "surging". */
+export const SURGING_VELOCITY_PCT = 15;
+
+/**
+ * Decide whether a tool belongs on the Trending (newcomer) surface.
+ *
+ * Trending is deliberately distinct from Explore:
+ *   - Products (no repo) are in while young or freshly hot on a social source.
+ *   - Curated ecosystem staples are EXCLUDED unless they're genuinely surging —
+ *     this is what keeps VS Code / Oh My Zsh out of Trending.
+ *   - Anything we discovered (github crawl / HN / PH / Reddit) is in while young,
+ *     surging, or carrying a fresh social signal; it "graduates" to Explore-only
+ *     once it ages out and cools off.
+ */
+export function computeTrendingEligible(input: {
+  kind: "repo" | "product";
+  source: "curated" | "github" | "hackernews" | "producthunt" | "reddit";
+  firstSeenAt: string | Date;
+  starGrowthPct7d?: number | null;
+  lastSignalAt?: string | Date | null;
+}): boolean {
+  const { kind, source, firstSeenAt, starGrowthPct7d, lastSignalAt } = input;
+  const now = Date.now();
+  const ageDays = (now - new Date(firstSeenAt).getTime()) / 86_400_000;
+
+  const isYoung = Number.isFinite(ageDays) && ageDays <= TRENDING_WINDOW_DAYS;
+  const isSurging =
+    starGrowthPct7d != null &&
+    Number.isFinite(starGrowthPct7d) &&
+    starGrowthPct7d >= SURGING_VELOCITY_PCT;
+  const hasFreshSignal =
+    lastSignalAt != null &&
+    (now - new Date(lastSignalAt).getTime()) / 86_400_000 <= SIGNAL_WINDOW_DAYS;
+
+  if (kind === "product") return isYoung || hasFreshSignal;
+  if (source === "curated") return isSurging; // staples only when truly hot
+  return isYoung || isSurging || hasFreshSignal;
 }

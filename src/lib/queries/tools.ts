@@ -10,7 +10,11 @@ function formatTool(tool: RawTool, cats: RawCategory[]): Tool {
   return {
     ...tool,
     websiteUrl: tool.websiteUrl ?? null,
+    kind: tool.kind as Tool["kind"],
+    source: tool.source as Tool["source"],
     lastPushedAt: tool.lastPushedAt?.toISOString() ?? null,
+    firstSeenAt: tool.firstSeenAt.toISOString(),
+    lastSignalAt: tool.lastSignalAt?.toISOString() ?? null,
     createdAt: tool.createdAt.toISOString(),
     updatedAt: tool.updatedAt.toISOString(),
     dataFetchedAt: tool.dataFetchedAt?.toISOString() ?? null,
@@ -44,6 +48,7 @@ export async function getTools({
   letter,
   cursor,
   limit = 48,
+  trendingOnly = false,
 }: {
   sort?: SortOption | "growth";
   category?: string;
@@ -53,6 +58,9 @@ export async function getTools({
   letter?: string;
   cursor?: string;
   limit?: number;
+  // Restrict to the newcomer/surging set that powers the Trending page — keeps
+  // it distinct from the full Explore catalog.
+  trendingOnly?: boolean;
 }): Promise<{ items: Tool[]; nextCursor: string | null }> {
   // Get tool IDs filtered by category
   let filteredIds: string[] | null = null;
@@ -106,6 +114,10 @@ export async function getTools({
 
   if (letter) {
     conditions.push(ilike(tools.name, `${letter}%`));
+  }
+
+  if (trendingOnly) {
+    conditions.push(eq(tools.trendingEligible, true));
   }
 
   if (cursor) {

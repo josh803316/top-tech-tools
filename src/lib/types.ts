@@ -26,11 +26,27 @@ export type Tool = {
   currentVersion: string | null;
   featured: boolean;
   trendingScore: number;
+  starGrowthPct7d: number | null;
+  kind: ToolKind;
+  source: ToolSource;
+  firstSeenAt: string;
+  trendingEligible: boolean;
+  socialScore: number | null;
+  socialSource: string | null;
+  lastSignalAt: string | null;
   categories: Category[];
   createdAt: string;
   updatedAt: string;
   dataFetchedAt: string | null;
 };
+
+export type ToolKind = "repo" | "product";
+export type ToolSource =
+  | "curated"
+  | "github"
+  | "hackernews"
+  | "producthunt"
+  | "reddit";
 
 export type SortOption = "stars" | "trending" | "newest" | "installs";
 export type QualityLevel = "elite" | "high" | "mid" | "low";

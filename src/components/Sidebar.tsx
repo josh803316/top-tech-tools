@@ -1,6 +1,6 @@
 "use client";
 
-import { useSearchParams, usePathname, useRouter } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useCallback } from "react";
 import { Terminal } from "lucide-react";
 import {
@@ -52,7 +52,6 @@ type SidebarProps = {
 
 export function Sidebar({ categories, counts }: SidebarProps) {
   const router = useRouter();
-  const pathname = usePathname();
   const searchParams = useSearchParams();
 
   const get = (key: string) => searchParams.get(key) ?? "";
@@ -65,9 +64,11 @@ export function Sidebar({ categories, counts }: SidebarProps) {
         else params.delete(k);
       }
       params.delete("cursor");
-      router.push(`${pathname}?${params.toString()}`);
+      // Filters live on the Explore catalog. Routing here (rather than to the
+      // current pathname) keeps them functional from the Trending landing page.
+      router.push(`/explore?${params.toString()}`);
     },
-    [router, pathname, searchParams]
+    [router, searchParams]
   );
 
   const activeCategory = get("category");

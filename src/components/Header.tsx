@@ -1,18 +1,16 @@
 "use client";
 
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { Search, Bell, ArrowUpRight } from "lucide-react";
 import { Suspense } from "react";
 
 function NavTabs() {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const sort = searchParams.get("sort");
 
   const tabs = [
-    { label: "Explore", href: "/", active: pathname === "/" && sort !== "trending" },
-    { label: "Trending", href: "/trending", active: pathname === "/trending" },
+    { label: "Trending", href: "/", active: pathname === "/" },
+    { label: "Explore", href: "/explore", active: pathname === "/explore" },
     { label: "Changelog", href: "/changelog", active: pathname === "/changelog" },
   ];
 
