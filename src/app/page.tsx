@@ -20,13 +20,61 @@ function timeAgo(iso: string | null) {
   return `${Math.floor(days / 30)}mo ago`;
 }
 
-const SOURCE_LABEL: Record<string, string> = {
-  github: "GITHUB",
-  hackernews: "HACKER NEWS",
-  producthunt: "PRODUCT HUNT",
-  reddit: "REDDIT",
-  curated: "SURGING",
+// Brand-colored provenance for each discovery source, so it's obvious at a glance
+// where a tool was reported from. `mark` is a tiny monogram (GitHub uses its icon).
+const SOURCE_META: Record<
+  string,
+  { label: string; color: string; mark: React.ReactNode }
+> = {
+  github: { label: "GitHub", color: "#8b949e", mark: "GH" },
+  hackernews: { label: "Hacker News", color: "#ff6600", mark: "Y" },
+  producthunt: { label: "Product Hunt", color: "#da552f", mark: "P" },
+  reddit: { label: "Reddit", color: "#ff4500", mark: "r/" },
+  curated: { label: "Surging", color: "var(--accent)", mark: <Flame size={10} /> },
 };
+
+const SOURCE_LABEL: Record<string, string> = Object.fromEntries(
+  Object.entries(SOURCE_META).map(([k, v]) => [k, v.label.toUpperCase()])
+);
+
+// Compact chip: brand-colored square monogram + source name. Makes provenance
+// (GitHub / Hacker News / Product Hunt / Reddit) unmistakable.
+function SourceBadge({ source }: { source: string }) {
+  const meta = SOURCE_META[source] ?? { label: source, color: "var(--text-secondary)", mark: "•" };
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "5px",
+        fontSize: "10px",
+        fontWeight: 600,
+        letterSpacing: "0.04em",
+        textTransform: "uppercase",
+        color: meta.color,
+      }}
+    >
+      <span
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: "15px",
+          height: "15px",
+          borderRadius: "4px",
+          background: `${meta.color}22`,
+          border: `1px solid ${meta.color}55`,
+          fontSize: "8px",
+          fontWeight: 700,
+          lineHeight: 1,
+        }}
+      >
+        {meta.mark}
+      </span>
+      {meta.label}
+    </span>
+  );
+}
 
 function isNew(firstSeenAt: string) {
   return Date.now() - new Date(firstSeenAt).getTime() < 30 * 86400000;
@@ -181,9 +229,9 @@ export default async function HomePage() {
 
               {/* Info strip */}
               <div style={{ padding: "16px 20px" }}>
-                <div style={{ display: "flex", gap: "6px", marginBottom: "8px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
                   {isNew(hero.firstSeenAt) && <span style={tagStyle("#22c55e")}>NEW</span>}
-                  <span style={tagStyle("var(--accent)")}>{SOURCE_LABEL[hero.source] ?? hero.source.toUpperCase()}</span>
+                  <SourceBadge source={hero.source} />
                   {hero.categories[0] && (
                     <span style={tagStyle("var(--text-secondary)")}>{hero.categories[0].label.toUpperCase()}</span>
                   )}
@@ -257,17 +305,13 @@ export default async function HomePage() {
                   </div>
                   <HeatMetric tool={tool} />
                 </div>
-                <div
-                  style={{
-                    fontSize: "9px",
-                    fontWeight: 600,
-                    letterSpacing: "0.1em",
-                    color: "var(--accent)",
-                    textTransform: "uppercase",
-                    marginBottom: "6px",
-                  }}
-                >
-                  {isNew(tool.firstSeenAt) ? "Just landed · " : ""}{SOURCE_LABEL[tool.source] ?? tool.source}
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+                  <SourceBadge source={tool.source} />
+                  {isNew(tool.firstSeenAt) && (
+                    <span style={{ fontSize: "9px", fontWeight: 600, letterSpacing: "0.08em", color: "#22c55e", textTransform: "uppercase" }}>
+                      Just landed
+                    </span>
+                  )}
                 </div>
                 <div style={{ fontSize: "15px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "4px" }}>
                   {tool.name}
