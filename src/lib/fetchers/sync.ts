@@ -23,7 +23,7 @@ import {
   type SocialSource,
 } from "./social";
 import { snapshotMetrics, computeStarGrowthPct7d } from "./history";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 function toSlug(name: string): string {
@@ -33,11 +33,12 @@ function toSlug(name: string): string {
 // Product Hunt topics that mark a post as an actual developer/AI/design tool —
 // everything else (Marketing, Sales, E-Commerce, generic SaaS) is dropped so the
 // trending surface stays dev-focused, not a Product Hunt mirror.
+// Strict: a generic "Artificial Intelligence" tag is NOT enough (every AI SaaS
+// carries it). Require an actual developer/design tooling topic so marketing/AI
+// SaaS (StoreClaw, PollyReach, …) is dropped while real dev tools (Kilo Code) stay.
 const PH_DEV_TOPICS = new Set([
   "developer tools",
-  "development",
   "design tools",
-  "artificial intelligence",
   "open source",
   "github",
   "api",
@@ -54,6 +55,14 @@ function isDevProduct(topics: string[]): boolean {
 const SHOW_HN_RE = /^show\s*hn[:\-]/i;
 function isShowHn(title: string): boolean {
   return SHOW_HN_RE.test(title);
+}
+
+// A Show HN must also read like a developer tool to become a product entry —
+// drops toys/art/news ("imagines the HN front page", "this up votes itself").
+const HN_DEV_RE =
+  /\b(cli|terminal|tui|editor|ide|compiler|database|sdk|api|framework|library|dev[\s-]?tool|developer|programming|kubernetes|docker|git|rust|golang|typescript|javascript|python|self[\s-]?host(?:ed|ing)?|llm|ai agent|agent|debugger|linter|parser|coding)\b/i;
+function looksLikeHnDevTool(title: string): boolean {
+  return HN_DEV_RE.test(title);
 }
 
 // Turn "Show HN: Foo – a fast bar" into "Foo". HN front-page headlines (news,
@@ -117,7 +126,7 @@ async function gatherSocialSignals(): Promise<{
       const score = hnPointsToSocialScore(c.points);
       const m = c.githubUrl ? ghParts(c.githubUrl) : null;
       if (m) addRepo(m[1], m[2], score, "hackernews");
-      else if (c.url && isShowHn(c.title))
+      else if (c.url && isShowHn(c.title) && looksLikeHnDevTool(c.title))
         products.push({
           name: cleanShowHnName(c.title),
           tagline: c.title,
@@ -569,6 +578,41 @@ async function syncProduct(hit: ProductHit) {
   }
 
   await setToolCategories(toolId, inferProductCategories(hit));
+}
+
+/**
+ * Re-fetch ONLY the social product launches (no repo refresh) and rebuild the
+ * product rows from scratch. Fast — used to re-apply tightened product filters
+ * without the full multi-hundred-repo sync. Products are ephemeral, so wiping
+ * and reinserting is fine; repo rows are never touched.
+ */
+export async function refreshProductsOnly(): Promise<{ synced: number; errors: string[] }> {
+  const { products, errors } = await gatherSocialSignals();
+
+  const existing = await db.select({ id: tools.id }).from(tools).where(eq(tools.kind, "product"));
+  const ids = existing.map((r) => r.id);
+  if (ids.length) {
+    await db.delete(toolCategories).where(inArray(toolCategories.toolId, ids));
+    await db.delete(tools).where(inArray(tools.id, ids));
+  }
+
+  let synced = 0;
+  const seen = new Set<string>();
+  for (const p of products) {
+    const slug = toSlug(p.name);
+    if (!slug || seen.has(slug)) continue;
+    seen.add(slug);
+    // Never shadow an existing repo row with a same-named product.
+    const clash = await db.query.tools.findFirst({ where: eq(tools.slug, slug) });
+    if (clash) continue;
+    try {
+      await syncProduct(p);
+      synced++;
+    } catch (e) {
+      errors.push(`[product] ${slug}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+  return { synced, errors };
 }
 
 export { upsertCategories };
