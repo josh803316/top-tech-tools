@@ -153,23 +153,56 @@ export default async function ToolPage({ params }: { params: Promise<{ slug: str
                 Homebrew
               </a>
             )}
+            {/* Primary action for tools with no GitHub repo (e.g. Product Hunt /
+                Hacker News products) — without this the page has no way to reach
+                the tool and no install instructions to show. */}
+            {!tool.githubUrl && tool.websiteUrl && (
+              <a
+                href={tool.websiteUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  padding: "11px 22px",
+                  background: "var(--text-primary)",
+                  color: "var(--bg)",
+                  borderRadius: "8px",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  textDecoration: "none",
+                }}
+              >
+                <ExternalLink size={14} />
+                {tool.source === "producthunt"
+                  ? "View on Product Hunt"
+                  : tool.source === "hackernews"
+                  ? "View on Hacker News"
+                  : "Visit Website"}
+              </a>
+            )}
           </div>
 
-          {/* Installation section */}
-          <div style={{ marginBottom: "36px" }}>
-            <h2 style={sectionHeading}>Installation</h2>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-              {tool.brewName && (
-                <InstallCard title="Homebrew" command={`brew install ${tool.brewName}`} />
-              )}
-              {tool.githubUrl && (
-                <InstallCard
-                  title="From Source"
-                  command={`git clone ${tool.githubUrl}`}
-                />
-              )}
+          {/* Installation section — only when there's an actual install method.
+              Products (Product Hunt / Hacker News) have no brew formula or repo,
+              so we hide the section rather than show an empty heading. */}
+          {(tool.brewName || tool.githubUrl) && (
+            <div style={{ marginBottom: "36px" }}>
+              <h2 style={sectionHeading}>Installation</h2>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                {tool.brewName && (
+                  <InstallCard title="Homebrew" command={`brew install ${tool.brewName}`} />
+                )}
+                {tool.githubUrl && (
+                  <InstallCard
+                    title="From Source"
+                    command={`git clone ${tool.githubUrl}`}
+                  />
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Topics */}
           {tool.githubTopics.length > 0 && (
