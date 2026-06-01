@@ -70,7 +70,7 @@ describe("discoverFromReddit", () => {
             },
           ]),
       } as unknown as Response;
-    });
+    }) as unknown as typeof fetch;
 
     const { repos, products } = await discoverFromReddit({ minUps: 200 });
 
@@ -89,7 +89,7 @@ describe("discoverFromReddit", () => {
   it("returns empty arrays on a non-OK response", async () => {
     globalThis.fetch = mock(async () => {
       return { ok: false, status: 429, json: async () => ({}) } as unknown as Response;
-    });
+    }) as unknown as typeof fetch;
     const { repos, products } = await discoverFromReddit({ minUps: 200 });
     expect(repos).toEqual([]);
     expect(products).toEqual([]);

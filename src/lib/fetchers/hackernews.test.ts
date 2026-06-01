@@ -11,7 +11,7 @@ function mockFetchOnce(body: unknown, ok = true, status = 200) {
       status,
       json: async () => body,
     } as unknown as Response;
-  });
+  }) as unknown as typeof fetch;
 }
 
 afterEach(() => {
@@ -61,7 +61,7 @@ describe("discoverFromHackerNews", () => {
   it("returns [] on a fetch error", async () => {
     globalThis.fetch = mock(async () => {
       throw new Error("network down");
-    });
+    }) as unknown as typeof fetch;
     const result = await discoverFromHackerNews();
     expect(result).toEqual([]);
   });
