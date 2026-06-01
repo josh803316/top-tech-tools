@@ -30,6 +30,41 @@ function toSlug(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
 }
 
+// Product Hunt topics that mark a post as an actual developer/AI/design tool —
+// everything else (Marketing, Sales, E-Commerce, generic SaaS) is dropped so the
+// trending surface stays dev-focused, not a Product Hunt mirror.
+const PH_DEV_TOPICS = new Set([
+  "developer tools",
+  "development",
+  "design tools",
+  "artificial intelligence",
+  "open source",
+  "github",
+  "api",
+  "apis",
+  "sdk",
+  "code editors",
+  "no-code",
+]);
+
+function isDevProduct(topics: string[]): boolean {
+  return topics.some((t) => PH_DEV_TOPICS.has(t.trim().toLowerCase()));
+}
+
+const SHOW_HN_RE = /^show\s*hn[:\-]/i;
+function isShowHn(title: string): boolean {
+  return SHOW_HN_RE.test(title);
+}
+
+// Turn "Show HN: Foo – a fast bar" into "Foo". HN front-page headlines (news,
+// opinion) are NOT launches, so only Show HN posts become product entries.
+function cleanShowHnName(title: string): string {
+  let t = title.replace(SHOW_HN_RE, "").trim();
+  const sep = t.search(/\s[–—-]\s/);
+  if (sep > 0) t = t.slice(0, sep).trim();
+  return t.slice(0, 60);
+}
+
 /** A normalized cross-source social signal for one repo. */
 type RepoSignal = { score: number; source: SocialSource };
 
@@ -61,7 +96,7 @@ async function gatherSocialSignals(): Promise<{
       const score = phRankToSocialScore(p.rank);
       const m = p.githubUrl ? ghParts(p.githubUrl) : null;
       if (m) addRepo(m[1], m[2], score, "producthunt");
-      else
+      else if (isDevProduct(p.topics))
         products.push({
           name: p.name,
           tagline: p.tagline,
@@ -82,9 +117,9 @@ async function gatherSocialSignals(): Promise<{
       const score = hnPointsToSocialScore(c.points);
       const m = c.githubUrl ? ghParts(c.githubUrl) : null;
       if (m) addRepo(m[1], m[2], score, "hackernews");
-      else if (c.url)
+      else if (c.url && isShowHn(c.title))
         products.push({
-          name: c.title.slice(0, 80),
+          name: cleanShowHnName(c.title),
           tagline: c.title,
           url: c.url,
           source: "hackernews",
@@ -121,6 +156,8 @@ export async function syncAllTools(): Promise<{ synced: number; errors: string[]
   const { repoSignals } = social;
 
   let synced = 0;
+  const curatedSlugs = new Set(CURATED_TOOLS.map((t) => t.slug));
+  const touched = new Set<string>(); // slugs synced this run (skip in refresh pass)
   for (const tool of CURATED_TOOLS) {
     try {
       await syncTool(tool, brewInstalls, repoSignals);
@@ -128,6 +165,7 @@ export async function syncAllTools(): Promise<{ synced: number; errors: string[]
     } catch (err) {
       errors.push(`${tool.slug}: ${err instanceof Error ? err.message : String(err)}`);
     }
+    touched.add(tool.slug);
     await new Promise((r) => setTimeout(r, 150));
   }
 
@@ -143,11 +181,12 @@ export async function syncAllTools(): Promise<{ synced: number; errors: string[]
 
   // 1) GitHub discovery: established topic crawl + RISING (young, lower-floor) crawl.
   try {
-    const [topicTools, risingTools] = await Promise.all([
-      discoverNewTools(knownSlugs),
-      discoverRisingRepos(knownSlugs),
-    ]);
-    const discovered = [...risingTools, ...topicTools]; // rising first: it's the point
+    // Sequential, rising first: the GitHub *search* API rate limit is tight
+    // (~30/min), so give the newcomer crawl the fresh budget rather than racing
+    // both crawls in parallel and starving it.
+    const risingTools = await discoverRisingRepos(knownSlugs);
+    const topicTools = await discoverNewTools(knownSlugs);
+    const discovered = [...risingTools, ...topicTools];
     for (const tool of discovered) {
       if (knownSlugs.has(tool.slug)) continue;
       knownSlugs.add(tool.slug);
@@ -162,6 +201,7 @@ export async function syncAllTools(): Promise<{ synced: number; errors: string[]
       } catch (err) {
         errors.push(`[discovered] ${tool.slug}: ${err instanceof Error ? err.message : String(err)}`);
       }
+      touched.add(tool.slug);
       await new Promise((r) => setTimeout(r, 150));
     }
   } catch (err) {
@@ -200,10 +240,52 @@ export async function syncAllTools(): Promise<{ synced: number; errors: string[]
     } catch (err) {
       errors.push(`[social-repo] ${owner}/${repo}: ${err instanceof Error ? err.message : String(err)}`);
     }
+    touched.add(slug);
     await new Promise((r) => setTimeout(r, 150));
   }
 
-  // 3) Product launches with no public repo (Stitch-class) — these can only ever
+  // 3) Refresh already-known discovered repos so their stars/created-date/velocity
+  //    and eligibility re-evaluate each run (otherwise a repo inserted once would
+  //    never update — and its objective newness/growth would never be learned).
+  try {
+    const existingRepos = await db.query.tools.findMany({
+      columns: { slug: true, githubOwner: true, githubRepo: true, githubTopics: true },
+      where: eq(tools.kind, "repo"),
+    });
+    for (const row of existingRepos) {
+      if (curatedSlugs.has(row.slug) || touched.has(row.slug)) continue;
+      if (!row.githubOwner || !row.githubRepo) continue;
+      const signal = repoSignals.get(`${row.githubOwner}/${row.githubRepo}`.toLowerCase());
+      const dt: DiscoveredTool = {
+        slug: row.slug,
+        name: row.githubRepo,
+        description: null,
+        githubOwner: row.githubOwner,
+        githubRepo: row.githubRepo,
+        stars: 0,
+        pushedAt: new Date().toISOString(),
+        topics: row.githubTopics ?? [],
+        // Re-derive from topics; empty => setToolCategories preserves existing.
+        categories: inferCategories(row.githubTopics ?? []),
+      };
+      try {
+        await syncDiscoveredTool(dt, brewInstalls, {
+          source: "github",
+          socialScore: signal?.score ?? null,
+          socialSource: signal?.source ?? null,
+        });
+        synced++;
+      } catch (err) {
+        errors.push(`[refresh] ${row.slug}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+      touched.add(row.slug);
+      await new Promise((r) => setTimeout(r, 120));
+    }
+  } catch (err) {
+    errors.push(`[refresh-pass] ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  // 4) Product launches with no public repo (Stitch-class) — these can only ever
   //    appear because of this path.
   for (const product of social.products) {
     const slug = toSlug(product.name);
@@ -233,8 +315,10 @@ async function upsertCategories() {
   }
 }
 
-/** Assign a tool's category associations (replaces any existing ones). */
+/** Assign a tool's category associations (replaces any existing ones). No-op on
+ *  an empty list so a metrics refresh never wipes existing associations. */
 async function setToolCategories(toolId: string, catSlugs: string[]) {
+  if (catSlugs.length === 0) return;
   const catRecords = await db.query.categories.findMany();
   const catMap = new Map(catRecords.map((c) => [c.slug, c.id]));
   await db.delete(toolCategories).where(eq(toolCategories.toolId, toolId));
@@ -277,11 +361,15 @@ async function syncTool(
   const socialSource = signal?.source ?? existing?.socialSource ?? null;
   const lastSignalAt = signal ? new Date() : (existing?.lastSignalAt ?? null);
 
+  const githubCreatedAt = githubData?.created_at
+    ? new Date(githubData.created_at)
+    : (existing?.githubCreatedAt ?? null);
+
   const starGrowthPct7d = existing ? await computeStarGrowthPct7d(toolId, stars) : null;
-  const trendingScore = computeTrendingScore({ stars, pushedAt, starGrowthPct7d, socialScore, firstSeenAt });
+  const trendingScore = computeTrendingScore({ stars, pushedAt, starGrowthPct7d, socialScore, repoCreatedAt: githubCreatedAt, kind: "repo" });
   const trendingEligible = computeTrendingEligible({
     kind: "repo",
-    source: "curated",
+    repoCreatedAt: githubCreatedAt,
     firstSeenAt,
     starGrowthPct7d,
     lastSignalAt,
@@ -300,6 +388,7 @@ async function syncTool(
     openIssues: githubData?.open_issues_count ?? 0,
     githubTopics: githubData?.topics ?? [],
     lastPushedAt: pushedAt ? new Date(pushedAt) : null,
+    githubCreatedAt,
     brewName: tool.brewName ?? null,
     brewUrl: tool.brewName ? `https://formulae.brew.sh/formula/${tool.brewName}` : null,
     installsLast30d,
@@ -333,25 +422,30 @@ async function syncDiscoveredTool(
   opts: { source: SocialSource | "github"; socialScore?: number | null; socialSource?: SocialSource | null }
 ) {
   const githubData = await fetchGitHubRepo(tool.githubOwner, tool.githubRepo);
+  const existing = await db.query.tools.findFirst({ where: eq(tools.slug, tool.slug) });
 
-  const stars = githubData?.stargazers_count ?? tool.stars;
-  const forks = githubData?.forks_count ?? 0;
-  const pushedAt = githubData?.pushed_at ?? tool.pushedAt;
+  // On a transient GitHub failure, preserve existing values rather than the
+  // discovery placeholder (refresh passes pass stars=0), so we never regress data.
+  const stars = githubData?.stargazers_count ?? existing?.stars ?? tool.stars;
+  const forks = githubData?.forks_count ?? existing?.forks ?? 0;
+  const pushedAt = githubData?.pushed_at ?? existing?.lastPushedAt?.toISOString() ?? tool.pushedAt;
   const githubUrl = `https://github.com/${tool.githubOwner}/${tool.githubRepo}`;
 
-  const existing = await db.query.tools.findFirst({ where: eq(tools.slug, tool.slug) });
   const toolId = existing?.id ?? randomUUID();
   const firstSeenAt = existing?.firstSeenAt ?? new Date();
 
   const socialScore = opts.socialScore ?? existing?.socialScore ?? null;
   const socialSource = opts.socialSource ?? existing?.socialSource ?? null;
   const lastSignalAt = opts.socialScore != null ? new Date() : (existing?.lastSignalAt ?? null);
+  const githubCreatedAt = githubData?.created_at
+    ? new Date(githubData.created_at)
+    : (existing?.githubCreatedAt ?? null);
 
   const starGrowthPct7d = existing ? await computeStarGrowthPct7d(toolId, stars) : null;
-  const trendingScore = computeTrendingScore({ stars, pushedAt, starGrowthPct7d, socialScore, firstSeenAt });
+  const trendingScore = computeTrendingScore({ stars, pushedAt, starGrowthPct7d, socialScore, repoCreatedAt: githubCreatedAt, kind: "repo" });
   const trendingEligible = computeTrendingEligible({
     kind: "repo",
-    source: opts.source,
+    repoCreatedAt: githubCreatedAt,
     firstSeenAt,
     starGrowthPct7d,
     lastSignalAt,
@@ -362,6 +456,7 @@ async function syncDiscoveredTool(
     forks,
     openIssues: githubData?.open_issues_count ?? 0,
     lastPushedAt: pushedAt ? new Date(pushedAt) : null,
+    githubCreatedAt,
     trendingScore,
     starGrowthPct7d,
     trendingEligible,
@@ -426,16 +521,14 @@ async function syncProduct(hit: ProductHit) {
 
   const trendingScore = computeTrendingScore({
     stars: 0,
-    pushedAt: null,
     starGrowthPct7d: null,
     socialScore: hit.socialScore,
     firstSeenAt,
+    kind: "product",
   });
   const trendingEligible = computeTrendingEligible({
     kind: "product",
-    source: hit.source,
     firstSeenAt,
-    starGrowthPct7d: null,
     lastSignalAt,
   });
 

@@ -20,6 +20,7 @@ export type Tool = {
   openIssues: number;
   githubTopics: string[];
   lastPushedAt: string | null;
+  githubCreatedAt: string | null;
   brewName: string | null;
   brewUrl: string | null;
   installsLast30d: number;

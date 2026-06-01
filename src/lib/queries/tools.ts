@@ -13,6 +13,7 @@ function formatTool(tool: RawTool, cats: RawCategory[]): Tool {
     kind: tool.kind as Tool["kind"],
     source: tool.source as Tool["source"],
     lastPushedAt: tool.lastPushedAt?.toISOString() ?? null,
+    githubCreatedAt: tool.githubCreatedAt?.toISOString() ?? null,
     firstSeenAt: tool.firstSeenAt.toISOString(),
     lastSignalAt: tool.lastSignalAt?.toISOString() ?? null,
     createdAt: tool.createdAt.toISOString(),

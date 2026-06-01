@@ -8,6 +8,7 @@ export type GitHubRepoData = {
   open_issues_count: number;
   topics: string[];
   pushed_at: string;
+  created_at: string;
 };
 
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
@@ -71,55 +72,66 @@ export function phRankToSocialScore(phRank: number): number {
  *
  * `phRank` is accepted as a convenience alias and folded into the social term.
  */
+function ageInDays(d: string | Date | null | undefined): number | null {
+  if (d == null) return null;
+  const ms = d instanceof Date ? d.getTime() : new Date(d).getTime();
+  if (!Number.isFinite(ms)) return null;
+  return (Date.now() - ms) / 86_400_000;
+}
+
 export function computeTrendingScore(input: {
   stars: number;
-  pushedAt: string | null;
+  pushedAt?: string | null;
   starGrowthPct7d?: number | null;
   socialScore?: number | null;
   firstSeenAt?: string | Date | null;
+  repoCreatedAt?: string | Date | null;
+  kind?: "repo" | "product";
   phRank?: number | null;
 }): number {
-  const { stars, starGrowthPct7d, socialScore, firstSeenAt, phRank } = input;
+  const { stars, starGrowthPct7d, socialScore, firstSeenAt, repoCreatedAt, kind, phRank } = input;
 
   const safeStars = Number.isFinite(stars) && stars > 0 ? stars : 0;
-  // Tiny tiebreak only — never a ranking driver. ~1.9 at 6k stars.
-  const starTie = Math.log10(safeStars + 1) * 0.5;
+  const repoAge = ageInDays(repoCreatedAt);
+  const isNewRepo = repoAge != null && repoAge <= NEW_REPO_WINDOW_DAYS;
 
-  // 1) Growth term (dominant). Each +1% weekly growth adds a meaningful chunk.
-  //    Clamp to avoid a single anomalous data point exploding the score.
+  // 1) Growth term (dominant when present). +1% weekly growth = +2; clamped.
   let growthTerm = 0;
   if (starGrowthPct7d != null && Number.isFinite(starGrowthPct7d)) {
     const g = Math.max(-50, Math.min(starGrowthPct7d, 500));
     growthTerm = g * 2;
   }
 
-  // 2) Social term (dominant). Normalized 0..100 cross-source heat; PH rank folds
-  //    in when an explicit socialScore wasn't supplied.
+  // 2) Social term. Normalized 0..100 heat, weighted < 1 so a single source can't
+  //    dwarf real GitHub traction; PH rank folds in when no explicit score given.
   let effectiveSocial = 0;
   if (socialScore != null && Number.isFinite(socialScore)) {
     effectiveSocial = Math.max(0, Math.min(socialScore, 100));
   } else if (phRank != null) {
     effectiveSocial = phRankToSocialScore(phRank);
   }
-  const socialTerm = effectiveSocial;
+  const socialTerm = effectiveSocial * 0.6;
 
-  // 3) Freshness term. Decays from ~25 (just discovered) toward 0 over weeks, so a
-  //    newly surfaced tool ranks even before velocity/social data accrues.
-  let freshnessTerm = 0;
-  if (firstSeenAt != null) {
-    const seen = firstSeenAt instanceof Date ? firstSeenAt.getTime() : new Date(firstSeenAt).getTime();
-    const days = (Date.now() - seen) / 86_400_000;
-    if (Number.isFinite(days)) {
-      freshnessTerm = 25 / (Math.max(days, 0) / 7 + 1);
-    }
-  }
+  // 3) Freshness term. Decays from ~25 over weeks. Anchored on repo creation for
+  //    repos (objective newness) and on first-seen for repo-less products.
+  const anchor = kind === "product" ? firstSeenAt : (repoCreatedAt ?? firstSeenAt);
+  const anchorAge = ageInDays(anchor);
+  const freshnessTerm = anchorAge != null ? 25 / (Math.max(anchorAge, 0) / 7 + 1) : 0;
 
-  return growthTerm + socialTerm + freshnessTerm + starTie;
+  // 4) Traction. A genuinely NEW repo with real stars is a strong signal, so let
+  //    its (log-damped) stars count for something — but only while it's new. Once
+  //    a repo ages out, stars collapse to a tiny tiebreak so size never dominates.
+  const tractionTerm = isNewRepo ? Math.log10(safeStars + 1) * 8 : 0;
+  const starTie = isNewRepo ? 0 : Math.log10(safeStars + 1) * 0.5;
+
+  return growthTerm + socialTerm + freshnessTerm + tractionTerm + starTie;
 }
 
 // --- Trending eligibility (newcomer gate) -----------------------------------
 
-/** A discovered tool stays in Trending while it's this young (days). */
+/** A repo counts as a "newcomer" while its GitHub repo is younger than this. */
+export const NEW_REPO_WINDOW_DAYS = 180;
+/** A repo-less product stays in Trending while first-seen within this window. */
 export const TRENDING_WINDOW_DAYS = 120;
 /** A fresh social signal keeps a tool in Trending for this long (days). */
 export const SIGNAL_WINDOW_DAYS = 30;
@@ -127,37 +139,38 @@ export const SIGNAL_WINDOW_DAYS = 30;
 export const SURGING_VELOCITY_PCT = 15;
 
 /**
- * Decide whether a tool belongs on the Trending (newcomer) surface.
+ * Decide whether a tool belongs on the Trending (newcomer) surface — distinct
+ * from the full Explore catalog.
  *
- * Trending is deliberately distinct from Explore:
- *   - Products (no repo) are in while young or freshly hot on a social source.
- *   - Curated ecosystem staples are EXCLUDED unless they're genuinely surging —
- *     this is what keeps VS Code / Oh My Zsh out of Trending.
- *   - Anything we discovered (github crawl / HN / PH / Reddit) is in while young,
- *     surging, or carrying a fresh social signal; it "graduates" to Explore-only
- *     once it ages out and cools off.
+ *   - Repos: in if the GitHub repo is genuinely young (objective, immune to when
+ *     WE happened to discover it), OR surging in stars, OR freshly hot on a
+ *     social source. This keeps old staples (VS Code, Oh My Zsh) out while a
+ *     weeks-old rocket like terax-ai is in, regardless of its `source` label.
+ *   - Products (no repo): in while recently first-seen or carrying a fresh signal.
  */
 export function computeTrendingEligible(input: {
   kind: "repo" | "product";
-  source: "curated" | "github" | "hackernews" | "producthunt" | "reddit";
+  repoCreatedAt?: string | Date | null;
   firstSeenAt: string | Date;
   starGrowthPct7d?: number | null;
   lastSignalAt?: string | Date | null;
 }): boolean {
-  const { kind, source, firstSeenAt, starGrowthPct7d, lastSignalAt } = input;
-  const now = Date.now();
-  const ageDays = (now - new Date(firstSeenAt).getTime()) / 86_400_000;
+  const { kind, repoCreatedAt, firstSeenAt, starGrowthPct7d, lastSignalAt } = input;
 
-  const isYoung = Number.isFinite(ageDays) && ageDays <= TRENDING_WINDOW_DAYS;
   const isSurging =
     starGrowthPct7d != null &&
     Number.isFinite(starGrowthPct7d) &&
     starGrowthPct7d >= SURGING_VELOCITY_PCT;
-  const hasFreshSignal =
-    lastSignalAt != null &&
-    (now - new Date(lastSignalAt).getTime()) / 86_400_000 <= SIGNAL_WINDOW_DAYS;
+  const signalAge = ageInDays(lastSignalAt);
+  const hasFreshSignal = signalAge != null && signalAge <= SIGNAL_WINDOW_DAYS;
 
-  if (kind === "product") return isYoung || hasFreshSignal;
-  if (source === "curated") return isSurging; // staples only when truly hot
-  return isYoung || isSurging || hasFreshSignal;
+  if (kind === "product") {
+    const seenAge = ageInDays(firstSeenAt);
+    const isYoung = seenAge != null && seenAge <= TRENDING_WINDOW_DAYS;
+    return isYoung || hasFreshSignal;
+  }
+
+  const repoAge = ageInDays(repoCreatedAt);
+  const isNewRepo = repoAge != null && repoAge <= NEW_REPO_WINDOW_DAYS;
+  return isNewRepo || isSurging || hasFreshSignal;
 }

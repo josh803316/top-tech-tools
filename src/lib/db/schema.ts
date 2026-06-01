@@ -24,6 +24,9 @@ export const tools = pgTable(
     openIssues: integer("open_issues").notNull().default(0),
     githubTopics: text("github_topics").array().notNull().default([]),
     lastPushedAt: timestamp("last_pushed_at"),
+    // When the GitHub repo itself was created — objective "newness" used by the
+    // trending gate (immune to when our crawl first noticed it).
+    githubCreatedAt: timestamp("github_created_at"),
     websiteUrl: text("website_url"),
     brewName: text("brew_name"),
     brewUrl: text("brew_url"),

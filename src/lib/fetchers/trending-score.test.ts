@@ -3,6 +3,7 @@ import {
   computeTrendingScore,
   computeTrendingEligible,
   SURGING_VELOCITY_PCT,
+  NEW_REPO_WINDOW_DAYS,
   TRENDING_WINDOW_DAYS,
 } from "./github";
 
@@ -101,50 +102,50 @@ test("freshly discovered tool outranks an identical older one (freshness decays)
 
 // --- eligibility (newcomer gate) -------------------------------------------
 
-test("curated staples are excluded unless genuinely surging", () => {
-  const flatStaple = computeTrendingEligible({
+test("old established repos are excluded unless surging or freshly hot", () => {
+  // An old staple (repo created years ago), flat, no signal — kept OUT regardless
+  // of when we first indexed it. This is what keeps VS Code / Oh My Zsh off Trending.
+  const oldStaple = computeTrendingEligible({
     kind: "repo",
-    source: "curated",
-    firstSeenAt: daysAgo(2), // recent re-seed must NOT make it eligible
+    repoCreatedAt: daysAgo(2000),
+    firstSeenAt: daysAgo(2), // recent re-index must NOT make it eligible
     starGrowthPct7d: 1,
   });
   const surgingStaple = computeTrendingEligible({
     kind: "repo",
-    source: "curated",
+    repoCreatedAt: daysAgo(2000),
     firstSeenAt: daysAgo(900),
     starGrowthPct7d: SURGING_VELOCITY_PCT + 5,
   });
-  expect(flatStaple).toBe(false);
+  expect(oldStaple).toBe(false);
   expect(surgingStaple).toBe(true);
 });
 
-test("discovered newcomers are eligible while young, and graduate out once old & cold", () => {
-  const young = computeTrendingEligible({
+test("a genuinely new repo is eligible by repo age, even if we indexed it long ago", () => {
+  const newRepoStaleIndex = computeTrendingEligible({
     kind: "repo",
-    source: "github",
-    firstSeenAt: daysAgo(10),
+    repoCreatedAt: daysAgo(20), // repo itself is weeks old
+    firstSeenAt: daysAgo(2000), // but we've "known" it forever
     starGrowthPct7d: 0,
   });
-  const oldAndCold = computeTrendingEligible({
+  const oldRepo = computeTrendingEligible({
     kind: "repo",
-    source: "github",
-    firstSeenAt: daysAgo(TRENDING_WINDOW_DAYS + 30),
+    repoCreatedAt: daysAgo(NEW_REPO_WINDOW_DAYS + 30),
+    firstSeenAt: daysAgo(5),
     starGrowthPct7d: 0,
     lastSignalAt: null,
   });
-  expect(young).toBe(true);
-  expect(oldAndCold).toBe(false);
+  expect(newRepoStaleIndex).toBe(true);
+  expect(oldRepo).toBe(false);
 });
 
 test("products are eligible while young or carrying a fresh social signal", () => {
   const youngProduct = computeTrendingEligible({
     kind: "product",
-    source: "producthunt",
     firstSeenAt: daysAgo(5),
   });
   const oldButHotProduct = computeTrendingEligible({
     kind: "product",
-    source: "reddit",
     firstSeenAt: daysAgo(TRENDING_WINDOW_DAYS + 60),
     lastSignalAt: daysAgo(2),
   });
