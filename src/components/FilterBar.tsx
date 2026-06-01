@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback } from "react";
 import type { Category, SortOption } from "@/lib/types";
 
@@ -17,7 +17,6 @@ type FilterBarProps = {
 
 export function FilterBar({ categories }: FilterBarProps) {
   const router = useRouter();
-  const pathname = usePathname();
   const searchParams = useSearchParams();
 
   const activeCategory = searchParams.get("category") ?? "";
@@ -35,9 +34,10 @@ export function FilterBar({ categories }: FilterBarProps) {
       }
       // Reset cursor on filter/sort change
       params.delete("cursor");
-      router.push(`${pathname}?${params.toString()}`);
+      // Filters apply to the Explore catalog.
+      router.push(`/explore?${params.toString()}`);
     },
-    [router, pathname, searchParams]
+    [router, searchParams]
   );
 
   return (

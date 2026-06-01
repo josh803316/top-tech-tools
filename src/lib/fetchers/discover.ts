@@ -75,6 +75,12 @@ const CATEGORY_TOPIC_QUERIES: Record<string, string[]> = {
 const MIN_STARS = 1000;
 const MAX_PUSHED_AGE_DAYS = 548; // ~18 months
 
+// "Rising" discovery: recently-CREATED repos with a much lower star floor, so a
+// brand-new tool that's catching fire (e.g. crynta/terax-ai: ~6k stars, weeks old)
+// surfaces immediately instead of waiting to clear the 1k-star establishment gate.
+const RISING_MIN_STARS = 250;
+const RISING_MAX_AGE_DAYS = 120;
+
 export type DiscoveredTool = {
   slug: string;
   name: string;
@@ -110,7 +116,10 @@ function isRecent(pushedAt: string): boolean {
   return ms < MAX_PUSHED_AGE_DAYS * 86400000;
 }
 
-async function searchGitHub(query: string): Promise<GitHubSearchItem[]> {
+async function searchGitHub(
+  query: string,
+  opts?: { minStars?: number; createdAfter?: string }
+): Promise<GitHubSearchItem[]> {
   const headers: Record<string, string> = {
     Accept: "application/vnd.github.v3+json",
   };
@@ -118,7 +127,11 @@ async function searchGitHub(query: string): Promise<GitHubSearchItem[]> {
     headers["Authorization"] = `Bearer ${GITHUB_TOKEN}`;
   }
 
-  const encoded = encodeURIComponent(`${query} stars:>${MIN_STARS} fork:false`);
+  const minStars = opts?.minStars ?? MIN_STARS;
+  const createdQualifier = opts?.createdAfter ? ` created:>${opts.createdAfter}` : "";
+  const encoded = encodeURIComponent(
+    `${query} stars:>${minStars} fork:false${createdQualifier}`
+  );
   const url = `https://api.github.com/search/repositories?q=${encoded}&sort=stars&order=desc&per_page=30`;
 
   try {
@@ -180,6 +193,60 @@ export async function discoverNewTools(
           pushedAt: item.pushed_at,
           topics: item.topics,
           categories: matchedCategories,
+        });
+      }
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Discover RISING new tools: repos created within the last ~120 days that have
+ * already cleared a modest star floor. This is the path that catches genuinely
+ * new, hot tools before they're established enough for the 1k-star crawl above.
+ *
+ * @param existingSlugs - Set of slugs already in CURATED_TOOLS (or DB)
+ * @returns Array of new tools to insert, deduplicated across queries
+ */
+export async function discoverRisingRepos(
+  existingSlugs: Set<string>
+): Promise<DiscoveredTool[]> {
+  const seen = new Set<string>(existingSlugs);
+  const results: DiscoveredTool[] = [];
+  const createdAfter = new Date(Date.now() - RISING_MAX_AGE_DAYS * 86400000)
+    .toISOString()
+    .slice(0, 10); // YYYY-MM-DD
+
+  for (const [category, queries] of Object.entries(CATEGORY_TOPIC_QUERIES)) {
+    for (const query of queries) {
+      await new Promise((r) => setTimeout(r, 250));
+
+      const items = await searchGitHub(query, {
+        minStars: RISING_MIN_STARS,
+        createdAfter,
+      });
+
+      for (const item of items) {
+        if (item.fork) continue;
+        if (item.stargazers_count < RISING_MIN_STARS) continue;
+
+        const [owner, repo] = item.full_name.split("/");
+        const slug = toSlug(repo);
+
+        if (seen.has(slug)) continue;
+        seen.add(slug);
+
+        results.push({
+          slug,
+          name: repo,
+          description: item.description,
+          githubOwner: owner,
+          githubRepo: repo,
+          stars: item.stargazers_count,
+          pushedAt: item.pushed_at,
+          topics: item.topics,
+          categories: inferCategories(item.topics, category),
         });
       }
     }
