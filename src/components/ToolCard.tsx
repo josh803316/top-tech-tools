@@ -1,6 +1,6 @@
 "use client";
 
-import { Star, GitFork, AlertCircle, Package, ExternalLink } from "lucide-react";
+import { Star, GitFork, AlertCircle, Package, ExternalLink, Flame, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import type { Tool } from "@/lib/types";
 
@@ -38,6 +38,82 @@ function toolAge(createdAt: string, nowMs: number): string {
   return `${years}y old`;
 }
 
+function heatStyle(tool: Tool) {
+  const score = tool.trendingScore;
+  if (score >= 75) {
+    return {
+      label: "Peak",
+      color: "#fb7185",
+      border: "rgba(251,113,133,0.42)",
+      bg: "linear-gradient(135deg, rgba(251,113,133,0.11), rgba(245,158,11,0.05) 44%, var(--surface) 82%)",
+      glow: "0 0 0 1px rgba(251,113,133,0.07), 0 12px 28px rgba(251,113,133,0.07)",
+    };
+  }
+  if (score >= 45) {
+    return {
+      label: "Hot",
+      color: "#f59e0b",
+      border: "rgba(245,158,11,0.34)",
+      bg: "linear-gradient(135deg, rgba(245,158,11,0.09), rgba(79,131,255,0.04) 48%, var(--surface) 82%)",
+      glow: "0 0 0 1px rgba(245,158,11,0.06)",
+    };
+  }
+  if (score >= 25) {
+    return {
+      label: "Rising",
+      color: "#22c55e",
+      border: "rgba(34,197,94,0.28)",
+      bg: "linear-gradient(135deg, rgba(34,197,94,0.07), rgba(79,131,255,0.035) 48%, var(--surface) 82%)",
+      glow: "none",
+    };
+  }
+  return {
+    label: "Steady",
+    color: "var(--accent)",
+    border: "var(--border)",
+    bg: "var(--surface)",
+    glow: "none",
+  };
+}
+
+function signalLabel(tool: Tool) {
+  if (tool.starGrowthPct7d != null && tool.starGrowthPct7d >= 15) {
+    return `+${Math.round(tool.starGrowthPct7d)}%/wk`;
+  }
+  if (tool.socialScore != null && tool.socialScore >= 55) {
+    return `${Math.round(tool.socialScore)} social`;
+  }
+  return null;
+}
+
+function SignalChip({ tool }: { tool: Tool }) {
+  const label = signalLabel(tool);
+  if (!label) return null;
+  const heat = heatStyle(tool);
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "4px",
+        fontSize: "10px",
+        fontWeight: 700,
+        letterSpacing: "0.04em",
+        color: heat.color,
+        background: heat.color.startsWith("var(") ? "rgba(79,131,255,0.12)" : `${heat.color}1f`,
+        border: `1px solid ${heat.color.startsWith("var(") ? "rgba(79,131,255,0.25)" : `${heat.color}42`}`,
+        borderRadius: "5px",
+        padding: "2px 6px",
+        textTransform: "uppercase",
+        whiteSpace: "nowrap",
+      }}
+    >
+      <TrendingUp size={10} />
+      {label}
+    </span>
+  );
+}
+
 function Stars({ n }: { n: number }) {
   const filled = starRating(n);
   return (
@@ -52,6 +128,7 @@ function Stars({ n }: { n: number }) {
 export function ToolCard({ tool }: { tool: Tool }) {
   const nowMs = new Date(tool.dataFetchedAt ?? tool.updatedAt).getTime();
   const activity = activityInfo(tool.lastPushedAt, nowMs);
+  const heat = heatStyle(tool);
 
   return (
     <Link
@@ -61,12 +138,13 @@ export function ToolCard({ tool }: { tool: Tool }) {
         display: "flex",
         flexDirection: "column",
         padding: "16px",
-        background: "var(--surface)",
-        border: "1px solid var(--border)",
+        background: heat.bg,
+        border: `1px solid ${heat.border}`,
         borderRadius: "10px",
         textDecoration: "none",
-        transition: "border-color 0.15s",
+        transition: "border-color 0.15s, box-shadow 0.15s",
         gap: "12px",
+        boxShadow: heat.glow,
       }}
     >
       {/* Header: name + activity badge */}
@@ -94,6 +172,25 @@ export function ToolCard({ tool }: { tool: Tool }) {
         >
           {activity.label}
         </span>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", minHeight: "22px" }}>
+        <span
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "4px",
+            fontSize: "10px",
+            fontWeight: 700,
+            letterSpacing: "0.06em",
+            color: heat.color,
+            textTransform: "uppercase",
+          }}
+        >
+          <Flame size={10} fill="currentColor" />
+          {heat.label} {Math.round(tool.trendingScore)}
+        </span>
+        <SignalChip tool={tool} />
       </div>
 
       {/* Stats grid: 2 columns */}

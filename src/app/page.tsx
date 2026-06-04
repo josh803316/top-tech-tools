@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Star, Copy, ChevronLeft, ChevronRight, Flame } from "lucide-react";
+import { Star, Copy, ChevronLeft, ChevronRight, Flame, Clock, TrendingUp } from "lucide-react";
 import { getTools } from "@/lib/queries/tools";
 
 export const revalidate = 3600;
@@ -82,21 +82,128 @@ function isNew(firstSeenAt: string) {
 
 type TrendingTool = Awaited<ReturnType<typeof getTools>>["items"][number];
 
+function heatStyle(tool: TrendingTool) {
+  const score = tool.trendingScore;
+  if (score >= 75) {
+    return {
+      label: "Peak heat",
+      color: "#fb7185",
+      border: "rgba(251,113,133,0.44)",
+      bg: "linear-gradient(135deg, rgba(251,113,133,0.13), rgba(245,158,11,0.06) 42%, var(--surface) 78%)",
+      glow: "0 0 0 1px rgba(251,113,133,0.08), 0 14px 34px rgba(251,113,133,0.08)",
+    };
+  }
+  if (score >= 45) {
+    return {
+      label: "Hot",
+      color: "#f59e0b",
+      border: "rgba(245,158,11,0.36)",
+      bg: "linear-gradient(135deg, rgba(245,158,11,0.10), rgba(79,131,255,0.04) 48%, var(--surface) 82%)",
+      glow: "0 0 0 1px rgba(245,158,11,0.06)",
+    };
+  }
+  if (score >= 25) {
+    return {
+      label: "Rising",
+      color: "#22c55e",
+      border: "rgba(34,197,94,0.28)",
+      bg: "linear-gradient(135deg, rgba(34,197,94,0.08), rgba(79,131,255,0.04) 48%, var(--surface) 82%)",
+      glow: "none",
+    };
+  }
+  return {
+    label: "Steady",
+    color: "var(--accent)",
+    border: "var(--border)",
+    bg: "var(--surface)",
+    glow: "none",
+  };
+}
+
+function tint(color: string, alpha: string) {
+  if (color.startsWith("var(")) return "rgba(79,131,255,0.12)";
+  return `${color}${alpha}`;
+}
+
+function signalLabel(tool: TrendingTool) {
+  if (tool.starGrowthPct7d != null && tool.starGrowthPct7d >= 15) {
+    return `+${Math.round(tool.starGrowthPct7d)}% stars/wk`;
+  }
+  if (tool.socialScore != null && tool.socialScore >= 55) {
+    return `${Math.round(tool.socialScore)} social heat`;
+  }
+  if (isNew(tool.firstSeenAt)) return "New arrival";
+  return null;
+}
+
 // Heat metric shown top-right of each card: repos show GitHub stars; products
 // (no repo) show their normalized cross-source social heat instead.
 function HeatMetric({ tool }: { tool: TrendingTool }) {
+  const heat = heatStyle(tool);
   if (tool.kind === "product" || tool.stars === 0) {
     return (
-      <span style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "12px", color: "var(--accent)" }}>
+      <span style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "12px", color: heat.color, fontWeight: 650 }}>
         <Flame size={11} fill="currentColor" />
         {Math.round(tool.socialScore ?? 0)}
       </span>
     );
   }
   return (
-    <span style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "12px", color: "var(--accent)" }}>
+    <span style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "12px", color: heat.color, fontWeight: 650 }}>
       <Star size={11} fill="currentColor" />
       {formatStars(tool.stars)}
+    </span>
+  );
+}
+
+function UpdatedStamp({ iso }: { iso: string | null }) {
+  if (!iso) return null;
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "4px",
+        fontSize: "11px",
+        fontWeight: 650,
+        color: "#d7dcff",
+        background: "rgba(215,220,255,0.08)",
+        border: "1px solid rgba(215,220,255,0.13)",
+        borderRadius: "5px",
+        padding: "3px 7px",
+        whiteSpace: "nowrap",
+      }}
+    >
+      <Clock size={11} />
+      Updated {timeAgo(iso)}
+    </span>
+  );
+}
+
+function SignalChip({ tool }: { tool: TrendingTool }) {
+  const label = signalLabel(tool);
+  if (!label) return null;
+  const heat = heatStyle(tool);
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "4px",
+        fontSize: "10px",
+        fontWeight: 700,
+        letterSpacing: "0.04em",
+        color: heat.color,
+        background: tint(heat.color, "1f"),
+        border: `1px solid ${tint(heat.color, "42")}`,
+        borderRadius: "5px",
+        padding: "2px 6px",
+        textTransform: "uppercase",
+        whiteSpace: "nowrap",
+      }}
+    >
+      <TrendingUp size={10} />
+      {label}
     </span>
   );
 }
@@ -125,6 +232,7 @@ export default async function HomePage() {
   const hero = tools[0];
   const featured = tools.slice(1, 3);
   const grid = tools.slice(3);
+  const heroHeat = hero ? heatStyle(hero) : null;
 
   return (
     <div style={{ padding: "32px 32px 64px" }}>
@@ -177,14 +285,15 @@ export default async function HomePage() {
           <Link href={`/tool/${hero.slug}`} style={{ display: "block" }}>
             <div
               style={{
-                background: "var(--surface)",
-                border: "1px solid var(--border)",
+                background: heroHeat?.bg ?? "var(--surface)",
+                border: `1px solid ${heroHeat?.border ?? "var(--border)"}`,
                 borderRadius: "12px",
                 overflow: "hidden",
                 height: "360px",
                 display: "flex",
                 flexDirection: "column",
                 position: "relative",
+                boxShadow: heroHeat?.glow ?? "none",
               }}
               className="card-hover"
             >
@@ -232,6 +341,7 @@ export default async function HomePage() {
                 <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
                   {isNew(hero.firstSeenAt) && <span style={tagStyle("#22c55e")}>NEW</span>}
                   <SourceBadge source={hero.source} />
+                  <SignalChip tool={hero} />
                   {hero.categories[0] && (
                     <span style={tagStyle("var(--text-secondary)")}>{hero.categories[0].label.toUpperCase()}</span>
                   )}
@@ -280,12 +390,13 @@ export default async function HomePage() {
             <Link key={tool.id} href={`/tool/${tool.slug}`} style={{ display: "block", flex: 1 }}>
               <div
                 style={{
-                  background: "var(--surface)",
-                  border: "1px solid var(--border)",
+                  background: heatStyle(tool).bg,
+                  border: `1px solid ${heatStyle(tool).border}`,
                   borderRadius: "12px",
                   padding: "16px",
                   height: "100%",
                   transition: "border-color 0.15s",
+                  boxShadow: heatStyle(tool).glow,
                 }}
               >
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "12px" }}>
@@ -307,6 +418,7 @@ export default async function HomePage() {
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
                   <SourceBadge source={tool.source} />
+                  <SignalChip tool={tool} />
                   {isNew(tool.firstSeenAt) && (
                     <span style={{ fontSize: "9px", fontWeight: 600, letterSpacing: "0.08em", color: "#22c55e", textTransform: "uppercase" }}>
                       Just landed
@@ -374,16 +486,21 @@ export default async function HomePage() {
             <Link key={tool.id} href={`/tool/${tool.slug}`} style={{ display: "block" }}>
               <div
                 style={{
-                  background: "var(--surface)",
-                  border: "1px solid var(--border)",
+                  background: heatStyle(tool).bg,
+                  border: `1px solid ${heatStyle(tool).border}`,
                   borderRadius: "10px",
                   padding: "14px 16px",
                   transition: "border-color 0.15s",
+                  boxShadow: heatStyle(tool).glow,
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
                   <span style={{ fontSize: "14px", fontWeight: 500, color: "var(--text-primary)" }}>{tool.name}</span>
                   <HeatMetric tool={tool} />
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "7px", marginBottom: "8px", minHeight: "20px", flexWrap: "wrap" }}>
+                  <SourceBadge source={tool.source} />
+                  <SignalChip tool={tool} />
                 </div>
                 <p
                   style={{
@@ -418,11 +535,7 @@ export default async function HomePage() {
                       </span>
                     ))}
                   </div>
-                  {tool.updatedAt && (
-                    <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
-                      Updated {timeAgo(tool.updatedAt)}
-                    </span>
-                  )}
+                  <UpdatedStamp iso={tool.dataFetchedAt ?? tool.updatedAt} />
                 </div>
                 {tool.brewName && (
                   <div
