@@ -1,21 +1,43 @@
 name: Daily Data Refresh
 
+# GitHub disables scheduled workflows after 60 days of repository inactivity.
+# Any push to the default branch resets that timer. Prefer workflow_dispatch
+# for ad-hoc runs so the schedule can stay on cron.
+
 on:
   schedule:
     - cron: "0 6 * * *" # 6am UTC daily
-  workflow_dispatch: # allow manual runs
+  workflow_dispatch: # allow manual runs (also counts as activity when used)
 
 jobs:
   refresh:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Call refresh endpoint
+        env:
+          VERCEL_URL: ${{ secrets.VERCEL_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          response=$(curl -s -o /tmp/response.json -w "%{http_code}" \
-            -X POST "${{ secrets.VERCEL_URL }}/api/refresh" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            -H "Content-Type: application/json")
-          cat /tmp/response.json
+          set -euo pipefail
+          if [ -z "${VERCEL_URL:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+            echo "Missing VERCEL_URL or CRON_SECRET secrets"
+            exit 1
+          fi
+          # Accept either a full origin or a host; normalize to https origin
+          base="${VERCEL_URL%/}"
+          case "$base" in
+            http://*|https://*) ;;
+            *) base="https://${base}" ;;
+          esac
+          response=$(curl -sS -o /tmp/response.json -w "%{http_code}" \
+            -X POST "${base}/api/refresh" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            --max-time 300)
+          echo "HTTP status: $response"
+          cat /tmp/response.json || true
+          echo
           if [ "$response" -ne 200 ]; then
             echo "Refresh failed with status $response"
             exit 1
