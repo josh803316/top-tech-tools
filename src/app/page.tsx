@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Star, Copy, ChevronLeft, ChevronRight, Flame, Clock, TrendingUp } from "lucide-react";
 import { getTools } from "@/lib/queries/tools";
+import { AGENTS } from "@/lib/agents-data";
 
 export const revalidate = 3600;
 
@@ -555,6 +556,59 @@ export default async function HomePage() {
               </div>
             </Link>
           ))}
+        </div>
+      </div>
+
+      {/* AI Agents & Ecosystems teaser */}
+      <div style={{ marginTop: 56 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <div>
+            <div style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 4 }}>
+              AI Agents + Ecosystems
+            </div>
+            <h2 style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
+              Agents, models &amp; full stack integrations
+            </h2>
+          </div>
+          <Link href="/agents" style={{ fontSize: 13, color: 'var(--accent)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            View full matrix <span>→</span>
+          </Link>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
+          {AGENTS.slice(0, 6).map((agent) => (
+            <Link key={agent.id} href="/agents" style={{ textDecoration: 'none' }}>
+              <div
+                style={{
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 10,
+                  padding: '14px 16px',
+                  transition: 'border-color 0.15s',
+                }}
+                className="card-hover"
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                  <span style={{ fontSize: 18 }}>{agent.emoji}</span>
+                  <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-primary)' }}>{agent.name}</span>
+                  <span style={{ marginLeft: 'auto', fontSize: 10, fontFamily: 'monospace', color: 'var(--text-muted)' }}>{agent.latestVersion}</span>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.35, marginBottom: 8 }}>
+                  {agent.description.slice(0, 110)}{agent.description.length > 110 ? '…' : ''}
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {agent.integrations.mcp && <span style={{ fontSize: 9, padding: '1px 5px', background: 'rgba(16,185,129,0.1)', color: '#10b981', borderRadius: 3 }}>MCP</span>}
+                  {agent.integrations.hooks && <span style={{ fontSize: 9, padding: '1px 5px', background: 'rgba(139,92,246,0.1)', color: '#8b5cf6', borderRadius: 3 }}>{agent.integrations.hooks} hooks</span>}
+                  {agent.models.slice(0, 1).map((m, i) => (
+                    <span key={i} style={{ fontSize: 9, padding: '1px 5px', background: 'var(--surface-2)', color: 'var(--text-secondary)', borderRadius: 3 }}>{m.name}</span>
+                  ))}
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
+          Living matrix of agents, supported models, and extensibility (MCP, hooks, skills, plugins, REST). Includes our MCP server ecosystem.
         </div>
       </div>
     </div>

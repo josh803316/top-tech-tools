@@ -97,6 +97,31 @@ export function Sidebar({ categories, counts }: SidebarProps) {
         </span>
       </div>
 
+      {/* Ecosystems – prominent link to the new agents matrix */}
+      <Section label="Ecosystems">
+        <a
+          href="/agents"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '4px 2px',
+            color: 'var(--accent)',
+            fontSize: 13,
+            fontWeight: 500,
+            textDecoration: 'none',
+          }}
+        >
+          <Bot size={14} />
+          Agents &amp; Models Matrix
+        </a>
+        <div style={{ fontSize: 10, color: 'var(--text-muted)', paddingLeft: 22, marginTop: -2, marginBottom: 6 }}>
+          Versions • MCP/hooks • Our stack
+        </div>
+      </Section>
+
+      <Divider />
+
       {/* Category */}
       <Section label="Category">
         <CheckRow

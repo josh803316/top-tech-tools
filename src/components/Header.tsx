@@ -11,6 +11,7 @@ function NavTabs() {
   const tabs = [
     { label: "Trending", href: "/", active: pathname === "/" },
     { label: "Explore", href: "/explore", active: pathname === "/explore" },
+    { label: "Agents", href: "/agents", active: pathname === "/agents" },
     { label: "Changelog", href: "/changelog", active: pathname === "/changelog" },
   ];
 

@@ -164,3 +164,32 @@ a {
   /* Hamburger hidden on desktop */
   .hamburger-btn { display: none !important; }
 }
+
+/* ── Agent Matrix (agents page & reusable) ─────────────────────────────────── */
+.agent-badge {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  padding: 1px 7px;
+  border-radius: 4px;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+}
+
+.agent-badge-green { background: rgba(16, 185, 129, 0.08); color: #10b981; border-color: rgba(16,185,129,0.25); }
+.agent-badge-purple { background: rgba(139, 92, 246, 0.08); color: #8b5cf6; border-color: rgba(139,92,246,0.25); }
+.agent-badge-blue { background: rgba(59, 130, 246, 0.08); color: #3b82f6; border-color: rgba(59,130,246,0.25); }
+.agent-badge-amber { background: rgba(245, 158, 11, 0.08); color: #f59e0b; border-color: rgba(245,158,11,0.25); }
+.agent-badge-emerald { background: rgba(16, 185, 129, 0.06); color: #059669; border-color: rgba(16,185,129,0.2); }
+.agent-badge-slate { background: rgba(148, 163, 184, 0.08); color: #64748b; border-color: rgba(148,163,184,0.25); }
+
+/* Light polish for the agents grid on this design system */
+.agent-matrix-card {
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.agent-matrix-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(79,131,255,0.08);
+}
