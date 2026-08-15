@@ -8,8 +8,6 @@ export type PHProduct = {
   topics: string[];
 };
 
-const PRODUCT_HUNT_TOKEN = process.env.PRODUCT_HUNT_TOKEN;
-
 const PH_ENDPOINT = "https://api.producthunt.com/v2/api/graphql";
 
 type PHPostNode = {
@@ -40,7 +38,8 @@ function extractGithubUrl(node: PHPostNode): string | null {
 export async function fetchTrendingProductHunt(
   opts?: { first?: number }
 ): Promise<PHProduct[]> {
-  if (!PRODUCT_HUNT_TOKEN) {
+  const productHuntToken = process.env.PRODUCT_HUNT_TOKEN;
+  if (!productHuntToken) {
     console.warn("PRODUCT_HUNT_TOKEN is unset; skipping Product Hunt fetch");
     return [];
   }
@@ -69,7 +68,7 @@ export async function fetchTrendingProductHunt(
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
-        Authorization: `Bearer ${PRODUCT_HUNT_TOKEN}`,
+        Authorization: `Bearer ${productHuntToken}`,
       },
       body: JSON.stringify({ query, variables: { first } }),
       next: { revalidate: 3600 },

@@ -39,7 +39,7 @@ export const tools = pgTable(
     // launch ("product", e.g. a Show HN / Product Hunt debut with no public repo).
     kind: text("kind").notNull().default("repo"),
     // Where we first found it: "curated" (hand-seeded ecosystem), "github"
-    // (topic/rising crawl), "hackernews", "producthunt", "reddit".
+    // (topic/rising crawl), "hackernews", "producthunt", "reddit", "lobsters".
     source: text("source").notNull().default("curated"),
     // When discovery first saw this tool. Drives the "newcomer" trending window.
     // Set once on insert and never overwritten (unlike createdAt semantics, this

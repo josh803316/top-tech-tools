@@ -47,7 +47,8 @@ export type ToolSource =
   | "github"
   | "hackernews"
   | "producthunt"
-  | "reddit";
+  | "reddit"
+  | "lobsters";
 
 export type SortOption = "stars" | "trending" | "newest" | "installs";
 export type QualityLevel = "elite" | "high" | "mid" | "low";

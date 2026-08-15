@@ -13,7 +13,7 @@
  * Reddit thread on one axis.
  */
 
-export type SocialSource = "hackernews" | "producthunt" | "reddit";
+export type SocialSource = "hackernews" | "producthunt" | "reddit" | "lobsters";
 
 export type RepoHit = {
   owner: string;

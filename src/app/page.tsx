@@ -31,6 +31,7 @@ const SOURCE_META: Record<
   hackernews: { label: "Hacker News", color: "#ff6600", mark: "Y" },
   producthunt: { label: "Product Hunt", color: "#da552f", mark: "P" },
   reddit: { label: "Reddit", color: "#ff4500", mark: "r/" },
+  lobsters: { label: "Lobsters", color: "#ac130d", mark: "L" },
   curated: { label: "Surging", color: "var(--accent)", mark: <Flame size={10} /> },
 };
 

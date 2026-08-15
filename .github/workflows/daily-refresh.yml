@@ -11,6 +11,9 @@ on:
 
 jobs:
   refresh:
+    concurrency:
+      group: daily-data-refresh
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -34,7 +37,10 @@ jobs:
             -X POST "${base}/api/refresh" \
             -H "Authorization: Bearer ${CRON_SECRET}" \
             -H "Content-Type: application/json" \
-            --max-time 300)
+            --max-time 300 \
+            --retry 2 \
+            --retry-delay 10 \
+            --retry-all-errors)
           echo "HTTP status: $response"
           cat /tmp/response.json || true
           echo

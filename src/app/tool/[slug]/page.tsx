@@ -179,6 +179,8 @@ export default async function ToolPage({ params }: { params: Promise<{ slug: str
                   ? "View on Product Hunt"
                   : tool.source === "hackernews"
                   ? "View on Hacker News"
+                  : tool.source === "lobsters"
+                  ? "View on Lobsters"
                   : "Visit Website"}
               </a>
             )}

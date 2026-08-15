@@ -17,6 +17,7 @@ import {
 import { fetchTrendingProductHunt } from "./producthunt";
 import { discoverFromHackerNews } from "./hackernews";
 import { discoverFromReddit } from "./reddit";
+import { discoverFromLobsters } from "./lobsters";
 import {
   hnPointsToSocialScore,
   type ProductHit,
@@ -147,6 +148,14 @@ async function gatherSocialSignals(): Promise<{
     products.push(...redditProducts);
   } catch (e) {
     errors.push(`[reddit] ${e instanceof Error ? e.message : String(e)}`);
+  }
+
+  // Lobsters: only direct repository links are accepted to keep precision high.
+  try {
+    const repos = await discoverFromLobsters({ minScore: 10 });
+    for (const r of repos) addRepo(r.owner, r.repo, r.socialScore, "lobsters");
+  } catch (e) {
+    errors.push(`[lobsters] ${e instanceof Error ? e.message : String(e)}`);
   }
 
   return { repoSignals, products, errors };
