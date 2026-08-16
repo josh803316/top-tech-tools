@@ -87,10 +87,10 @@ describe("fetchTrendingProductHunt", () => {
       topics: ["Developer Tools", "Open Source"],
     });
 
-    expect(result[1].rank).toBe(2);
-    expect(result[1].name).toBe("Beta");
-    expect(result[1].githubUrl).toBeNull();
-    expect(result[1].topics).toEqual(["Productivity"]);
+    expect(result[1]?.rank).toBe(2);
+    expect(result[1]?.name).toBe("Beta");
+    expect(result[1]?.githubUrl).toBeNull();
+    expect(result[1]?.topics).toEqual(["Productivity"]);
   });
 
   it("returns [] on fetch error", async () => {

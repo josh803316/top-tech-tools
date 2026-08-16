@@ -66,7 +66,7 @@ async function pickClosestToSevenDaysAgo(
     .orderBy(desc(toolMetricsHistory.capturedAt))
     .limit(1);
 
-  if (atOrBefore.length > 0) return atOrBefore[0].stars ?? null;
+  if (atOrBefore.length > 0) return atOrBefore[0]?.stars ?? null;
 
   const earliest = await db
     .select({ stars: toolMetricsHistory.stars })
@@ -76,7 +76,7 @@ async function pickClosestToSevenDaysAgo(
     .limit(1);
 
   if (earliest.length === 0) return null;
-  return earliest[0].stars ?? null;
+  return earliest[0]?.stars ?? null;
 }
 
 /**

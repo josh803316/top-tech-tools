@@ -105,7 +105,7 @@ async function gatherSocialSignals(): Promise<{
     for (const p of ph) {
       const score = phRankToSocialScore(p.rank);
       const m = p.githubUrl ? ghParts(p.githubUrl) : null;
-      if (m) addRepo(m[1], m[2], score, "producthunt");
+      if (m?.[1] && m[2]) addRepo(m[1], m[2], score, "producthunt");
       else if (isDevProduct(p.topics))
         products.push({
           name: p.name,
@@ -126,7 +126,7 @@ async function gatherSocialSignals(): Promise<{
     for (const c of hn) {
       const score = hnPointsToSocialScore(c.points);
       const m = c.githubUrl ? ghParts(c.githubUrl) : null;
-      if (m) addRepo(m[1], m[2], score, "hackernews");
+      if (m?.[1] && m[2]) addRepo(m[1], m[2], score, "hackernews");
       else if (c.url && isShowHn(c.title) && looksLikeHnDevTool(c.title))
         products.push({
           name: cleanShowHnName(c.title),
