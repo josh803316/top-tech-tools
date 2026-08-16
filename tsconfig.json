@@ -1,4 +1,5 @@
 {
+  "extends": "@josh803316/shared-config/tsconfig/ui.json",
   "compilerOptions": {
     "target": "ES2017",
     "lib": ["dom", "dom.iterable", "esnext"],

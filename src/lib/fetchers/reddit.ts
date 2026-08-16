@@ -51,6 +51,7 @@ export function extractGithubUrl(url: string | null): string | null {
     const parts = parsed.pathname.split("/").filter(Boolean);
     if (parts.length < 2) return null;
     const [owner, repo] = parts;
+    if (!owner || !repo) return null;
     return `https://github.com/${owner}/${repo.replace(/\.git$/, "")}`;
   } catch {
     return null;
@@ -141,6 +142,7 @@ export async function discoverFromReddit(
         if (!m) continue;
         const owner = m[1];
         const repo = m[2];
+        if (!owner || !repo) continue;
         const key = `${owner}/${repo}`.toLowerCase();
         if (seenRepo.has(key)) continue;
         seenRepo.add(key);

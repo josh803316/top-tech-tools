@@ -175,6 +175,7 @@ export async function discoverNewTools(
         if (item.stargazers_count < MIN_STARS) continue;
 
         const [owner, repo] = item.full_name.split("/");
+        if (!owner || !repo) continue;
         const slug = toSlug(repo);
 
         if (seen.has(slug)) continue;
@@ -232,6 +233,7 @@ export async function discoverRisingRepos(
         if (item.stargazers_count < RISING_MIN_STARS) continue;
 
         const [owner, repo] = item.full_name.split("/");
+        if (!owner || !repo) continue;
         const slug = toSlug(repo);
 
         if (seen.has(slug)) continue;
@@ -284,7 +286,8 @@ export function githubCandidatesFromUrls(
     if (parts.length < 2) continue;
 
     const owner = parts[0];
-    const repo = parts[1].replace(/\.git$/, "");
+    const repo = parts[1]?.replace(/\.git$/, "");
+    if (!owner || !repo) continue;
     const key = `${owner}/${repo}`.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);

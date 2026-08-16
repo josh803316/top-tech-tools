@@ -54,8 +54,8 @@ describe("discoverFromHackerNews", () => {
       numComments: 88,
     });
     // dev-tool-ish but no github link
-    expect(result[1].githubUrl).toBeNull();
-    expect(result[1].url).toBe("https://example.com/ripgrep-review");
+    expect(result[1]?.githubUrl).toBeNull();
+    expect(result[1]?.url).toBe("https://example.com/ripgrep-review");
   });
 
   it("returns [] on a fetch error", async () => {
